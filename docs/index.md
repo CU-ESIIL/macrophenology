@@ -1,10 +1,10 @@
-# [Your Working Group Name]
+# ESIIL Macrophenology Working Group
 
-Welcome to the [Your Working Group Name] repository, part of the Environmental Data Science Innovation and Inclusion Lab (ESIIL). This repository serves as the central hub for our working group, hosting our project description, proposals, member bios, codebase, and more.
+Welcome to the Macrophenology Working Group repository, part of the Environmental Data Science Innovation and Inclusion Lab (ESIIL). This repository serves as the central hub for our working group, hosting our project description, proposals, member bios, codebase, and more.
 
 ## Our Project
 
-[Provide a brief overview of your project here. Explain what you aim to achieve, the importance of your project, and its expected impact.]
+Plant phenology — the seasonal timing of leaf-out, budding, flowering, fruiting, and leaf-off — is the most easily observable and well-documented biological response to climate change. Changes in phenology have many implications for ecosystem services relevant to society (e.g., food security, carbon sequestration, seasonal allergies). Often we need to know where and when these seasonal changes in plants occur, which is challenging given their sensitivity to changes in climate. However, little is known about how plant phenology influences a species’ ability to persist in different locations in the face of climate change, how rare versus common species respond to climate, or how native vs. invasive plants may respond to climate change differently. We will tackle these questions by combining different types of phenological data with species distribution data, which will require access to advanced computing resources. We will use a co-production framework with Indigenous scholars to develop a research approach and products that are needed and of value to their communities. 
 
 ## Project Proposal
 
@@ -12,11 +12,10 @@ Welcome to the [Your Working Group Name] repository, part of the Environmental D
 
 ## Group Members
 
-[List the names and a brief description of each group member, possibly linking to their personal or professional web pages.]
-
-- **Member 1**: Brief description or role within the group.
-- **Member 2**: Brief description or role within the group.
-- ...
+- **Sydne Record** (PI): University of Maine, Orono, ME
+- **Linda Black Elk** (Co-PI): North American Traditional Indigenous Food Systems (NATIFS), Minneapolis, MN
+- **Kai Zhu** (Co-PI): University of Michigan, Ann Arbor, MI
+- **Eric Sokol** (Tech Lead): National Ecological Observatory Network (NEON), Battelle, Boulder, CO
 
 ## Code Repository
 

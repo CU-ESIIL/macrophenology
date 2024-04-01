@@ -3,6 +3,13 @@
 ## Overview
 Brief description of the data processing objectives and scope. Reminder to adhere to data ownership and usage guidelines.
 
+## ACCESS proposal
+
+The Macrophenology working group, supported by ESIIL, intends to explore the interaction between phenological shifts and species range shifts in response to climate change, using multiple sources of data (remote sensing, herbarium, and field observations). This work will include expanding the "ecological community data design pattern" (ecocomDP) data model and its associated tools to interact with plant trait and phenological databases to create ecocomDP+ derived datasets. Data integration and co-production will be most successful if we can bring together subject matter experts (SMEs) on key aspects of this synthesis endeavor, including scientists, Tribal community members and scholars, data providers, environmental data scientists, and cyberinfrastructure SMEs. 
+
+Derived datasets will use the extended ecocomDP+ standard and will be stored in a shared Jetstream2 Volume using columnar file formats (e.g., parquet) to facilitate the use of cloud-native tools. Workflow development will be collaborative and reproducible using open-source software and tools (e.g., R, Python, GitHub). Initial development will use an ACCESS Explore allocation for the Jetstream2 Cloud using 200k SUs (Jetstream2 vCPU hours). Compute resources will be used for (1) compiling the ecocomDP+ datasets to feed into the analysis, (2) calculating shifts in species ranges and phenologies, and (3) conducting analyses linking range shifts and phenology to other species traits and climate change. Remotely sensed datasets, especially time-series data, are characterized by their voluminous nature, often referred to as "big data." Processing and analyzing these extensive datasets requires substantial storage capacities and high-performance computing nodes. The workflow will initially be developed for a subset of target taxa and then scaled up.
+
+ 
 ## Data Sources
 List and describe data sources used, including links to cloud-optimized sources. Highlight permissions and compliance with data ownership guidelines.
 

@@ -14,9 +14,8 @@ Derived datasets will use the extended ecocomDP+ standard and will be stored in 
  - Eric Sokol
  - Sydne Record
 
-### Associated grangs
+### Associated grants
  - ESIIL
- - CyVerse
  - NEON
  - others?
 

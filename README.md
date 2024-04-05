@@ -5,6 +5,8 @@ Welcome to the **Macrophenology** repository, an integral part of the Environmen
 ## Our Project
 [Provide a brief overview of your project here. Describe what you aim to achieve, the importance of your project, and its expected impact.]
 
+TODO - load project info
+
 ## Documentation
 - Access detailed documentation on our [GitHub Pages site](https://your-gh-pages-url/).
 - Find comprehensive guides, tutorials, and additional resources.

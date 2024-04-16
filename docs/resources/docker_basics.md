@@ -247,7 +247,7 @@ You can see all of this information on the ESIIL dockerhub page.
 
 ![DockerHub](../assets/docker_basics/dockerhub.png)
 
-Leave the Entrypoint, Working Directory, and UID blank. Add port 8888 as a container port.
+Leave the Entrypoint blank, and set the working directory to /home/jovyan/data-store and the UID to 1000. Add container port 8888. This will mount and give you access to the cyverse data store. Because the file explorer GUI will not let you go above the working directory that is set, you will have to use the terminal to go up one directory and copy over any files you included in your container.
 
 ![ContainerPort](../assets/docker_basics/container_port.png)
 

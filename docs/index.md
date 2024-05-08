@@ -4,11 +4,10 @@ Welcome to the Macrophenology Working Group repository, part of the Environmenta
 
 ## Our Project
 
-Plant phenology — the seasonal timing of leaf-out, budding, flowering, fruiting, and leaf-off — is the most easily observable and well-documented biological response to climate change. Changes in phenology have many implications for ecosystem services relevant to society (e.g., food security, carbon sequestration, seasonal allergies). Often we need to know where and when these seasonal changes in plants occur, which is challenging given their sensitivity to changes in climate. However, little is known about how plant phenology influences a species’ ability to persist in different locations in the face of climate change, how rare versus common species respond to climate, or how native vs. invasive plants may respond to climate change differently. We will tackle these questions by combining different types of phenological data with species distribution data, which will require access to advanced computing resources. We will use a co-production framework with Indigenous scholars to develop a research approach and products that are needed and of value to their communities. 
+Plant phenology — the seasonal timing of leaf-out, budding, flowering, fruiting, and leaf-off — is the most easily observable and well-documented biological response to climate change. Changes in phenology have many aspects of plants relevant to society (e.g., food security, carbon sequestration, seasonal allergies). Often we need to know where and when these seasonal changes in plants occur, which is challenging given their sensitivity to changes in climate. However, little is known about how plant phenology influences a species’ ability to persist in different locations in the face of climate change, how rare versus common species respond to climate, or how native vs. invasive plants may respond to climate change differently. We will tackle these questions by combining different types of phenological data with species distribution data, which will require access to advanced computing resources. We will use a co-production framework with Indigenous scholars to develop a research approach and products that are needed and of value to their communities. 
 
 ## Project Proposal
-
-[Link to the detailed project proposal document or include the proposal directly in the repository. This should outline the goals, methodologies, anticipated challenges, and projected timelines.]
+Here is our [project proposal](https://drive.google.com/file/d/10pyxXbELhVJ2rqKo6sEX-euGA2fmeY3a/view?usp=sharing)
 
 ## Group Members
 

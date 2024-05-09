@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/780492293.svg)](https://zenodo.org/doi/10.5281/zenodo.11168033)
+
 # Macrophenology
 
 Welcome to the **Macrophenology** repository, an integral part of the Environmental Data Science Innovation and Inclusion Lab (ESIIL). This repository is the central hub for our working group, encompassing our project overview, proposals, team member information, codebase, and more.

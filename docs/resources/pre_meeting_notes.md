@@ -1,15 +1,19 @@
 # Pre-Meeting Notes
 
-## Meeting Details
-- **Date:**
-- **Time:**
+## Meeting Details - [WG Meeting Guide](https://docs.google.com/document/d/16-D_7WJDpPCusyL25pokSjiDkcJoMIliu7wJeCfdt4M/edit#heading=h.h0mmrmun1xs0)
+- **Date:** July 16-19, 2024
+- **Time:** 9AM (MDT) - 5PM (MDT) Tues-Fri
 - **Location:**
-- **Facilitator:**
+4001 Discovery Drive, Boulder, CO - 
+SEEC Building, CU Boulder East Campus, VizStudio (S372)
+- **Facilitator:** Sydne Record
 
 ## Attendees
-- List of attendees
+- see the WG Meeting Guide linked above
 
-## Agenda
+## Agenda  
+- [Link to agenda](https://docs.google.com/document/d/1HKELyeLE5Fs02499jGOYWAflqtHGhs1bbA688_mgxNs)
+- Google Drive: [ESIIL_Macrophenology](https://drive.google.com/drive/folders/1p4doCQx02lalPDxzoYeAYX1O1mbmTJud)
 
 ### 1. Opening Remarks
 - Brief welcome and overview of the meeting's objectives.

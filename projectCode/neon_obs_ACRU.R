@@ -17,8 +17,12 @@ acruTags <- filter(ind, taxonID=="ACRU")%>%
                           nativeStatusCode, individualID, growthForm)
 
 acruObs <- filter(obs, individualID%in%acruTags$individualID &
-                    phenophaseName=="Leaves")
+                    phenophaseName%in%c("Breaking leaf buds", "Leaves"))
 
-acruAll <- left_join(acruTags, acruObs, by='individualID')
+acruAll <- left_join(acruTags, acruObs, by=c('siteID', 'individualID'))
+
+#write.csv(acruAll, paste(getwd(), "projectCode/acru_harv.csv", sep='/'), row.names=FALSE)
+
+
 
 

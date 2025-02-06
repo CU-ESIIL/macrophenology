@@ -17,8 +17,9 @@ TODO - load project info
 [Link to the detailed project proposal document or include it directly in the repository. Outline the goals, methodologies, anticipated challenges, and projected timelines.]
 
 ## Group Members
-- Member 1: Brief description or role within the group.
-- Member 2: Brief description or role within the group.
+- Sydne Record (PI): University of Maine, Orono, ME
+- Kai Zhu (Co-PI): University of Michigan, Ann Arbor, MI
+- Eric Sokol (Tech Lead): National Ecological Observatory Network (NEON), Battelle, Boulder, CO
 - ...
 - [Link to more detailed bios or profiles if available.]
 

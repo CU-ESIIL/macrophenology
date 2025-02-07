@@ -1,0 +1,331 @@
+---
+title: 'neon vegetation structure data'
+embed-resources: true
+author: "Yi Liu"
+date: "`r format(Sys.Date(), '%m/%d/%Y')`"
+format:
+  html:
+    code-folding: show
+    highlight: textmate
+    number-sections: true
+    theme: flatly
+    toc: TRUE
+    toc-depth: 4
+    toc-float:
+      collapsed: false
+      smooth-scroll: true
+---
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+# download vegetation strucutre data
+```{r}
+VstDat_try <- neonUtilities::loadByProduct(dpID="DP1.10098.001", 
+                             site = c("HARV","JERC"),
+                             startdate = "2014-01",
+                             enddate = "2022-12",
+                             package = "basic", check.size = FALSE, token = Sys.getenv('NEON_PAT'))
+
+write_rds(VstDat_try, "../data/VstDat_try.rds")
+```
+
+# analysis
+```{r}
+VstDat_try <- read_rds("../data/VstDat_try.rds")
+
+
+# Extract the relevant tables
+vst_individual <- VstDat_try$vst_apparentindividual
+vst_mapping <- VstDat_try$vst_mappingandtagging
+
+# Join mapping data with individual data
+vst_data <- vst_individual %>%
+#  select(plotID, siteID, stemDiameter, eventID, individualID) %>%
+  left_join(vst_mapping %>% 
+              select(individualID, scientificName, taxonID),
+            by = c("individualID")) 
+```
+
+## check the subplot data available
+
+### by date
+```{r}
+# existence plot for each subplot in each year
+vst_data %>%
+  group_by(subplotID, date, siteID) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = date, y = subplotID)) +
+  geom_tile(aes(fill = n)) +
+  scale_fill_viridis_c() +
+  facet_wrap(~siteID) +
+  labs(
+    x = "Year",
+    y = "Subplot ID",
+    fill = "Number of trees"
+  ) +
+  theme_classic()
+```
+
+### by year
+just found the eventID and date year might not be the same, so we need to extract the year from the eventID
+
+```{r}
+# existence plot for each subplot in each year
+vst_data %>%
+  mutate(year = substr(eventID, 10, 13)) %>%
+  group_by(subplotID, year, siteID) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = year, y = subplotID)) +
+  geom_tile(aes(fill = n)) +
+  scale_fill_viridis_c() +
+  facet_wrap(~siteID) +
+  labs(
+    x = "Year",
+    y = "Subplot ID",
+    fill = "Number of trees"
+  ) +
+  theme_classic()
+
+```
+## only selectsubplot with observation for each year from 2015 to 2022
+```{r}
+vst_individual_sub <- vst_data %>%
+  mutate(year = substr(eventID, 10, 13)) %>%
+  filter(year != "2014") %>%
+  group_by(subplotID, siteID) %>%
+  summarize(
+    n = n_distinct(year)
+  ) %>%
+  filter(n == 8) %>%
+  select(subplotID, siteID) %>%
+  left_join(vst_data, by = c("subplotID", "siteID"))
+```
+
+```{r}
+vst_individual_sub %>%
+  distinct(subplotID, siteID) 
+```
+
+400 plot: HARV 5, JERC 4
+
+```{r}
+# create a contigient table of growth form and plant status
+contigent <- vst_individual_sub %>%
+  group_by(growthForm, plantStatus) %>%
+  summarize(n = n()) %>%
+  pivot_wider(names_from = plantStatus, values_from = n) 
+# aggregrate the columns by "live", contains "live,", other
+
+contingency_agg <- vst_individual_sub %>%
+  group_by(growthForm, plantStatus) %>%
+  summarize(n = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = plantStatus, values_from = n, values_fill = list(n = 0)) %>%
+  mutate(
+    live_total = coalesce(`Live`, 0),
+    contains_live = rowSums(select(., contains("Live,")), na.rm = TRUE),
+    other = rowSums(select(., -growthForm, -`Live`, -contains("Live,")), na.rm = TRUE)
+  ) %>%
+  select(growthForm, live_total, contains_live, other) 
+
+contigent
+
+contingency_agg
+```
+
+
+```{r}
+species_list <- vst_individual_sub %>%
+  filter(grepl("400", subplotID)) %>%
+  group_by(taxonID, scientificName, siteID) %>%
+  summarize(
+  abundance = sum(plantStatus == "Live")) %>%
+  mutate(abundance = if_else(siteID == "JERC", abundance / 3 * 4, abundance)) %>% # correct for the different number of subplots    
+  filter(abundance > 250) 
+
+
+# Summarize data by species and year
+species_summary <- vst_individual_sub %>%
+  filter(taxonID %in% species_list$taxonID) %>%
+  filter(grepl("400", subplotID)) %>%
+  mutate(year = as.numeric(substr(eventID, 10, 13))) %>%
+  group_by(subplotID, scientificName, year, siteID) %>%
+  summarize(
+    abundance = n(),
+    live_abundance = sum(plantStatus == "Live")
+    ) 
+
+species_summary %>%
+  ggplot(aes(x = year, y = abundance, color = scientificName, group = scientificName)) +
+  geom_line(linetype = "dashed") +
+  geom_point(shape = 1) +
+  geom_line(aes(y = live_abundance)) +
+  geom_point(aes(y = live_abundance)) +
+  facet_grid(siteID ~ subplotID) +
+  labs(
+    x = "Year",
+    y = "Tree number",
+    color = "Species"
+  ) +
+  theme_classic()
+```
+
+```{r}
+species_summary %>%
+  ggplot(aes(x = year, y = abundance, color = scientificName, group = scientificName)) +
+  geom_line(aes(y = live_abundance)) +
+  geom_point(aes(y = live_abundance)) +
+  facet_grid(siteID ~ subplotID) +
+  labs(
+    x = "Year",
+    y = "Tree number",
+    color = "Species"
+  ) +
+  theme_classic()
+```
+
+### check Eastern hemlock
+```{r}
+hemlock <- vst_individual_sub %>%
+  mutate(year = as.numeric(substr(eventID, 10, 13))) %>%
+  filter(grepl("400", subplotID) & taxonID == "TSCA") 
+
+hemlock_sum <- hemlock %>%
+  group_by(growthForm, plantStatus) %>%
+  summarize(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = plantStatus, values_from = n, values_fill = list(n = 0)) 
+
+ggplot(hemlock, aes(x = year)) +
+  geom_line(aes(y = ..count.., color = plantStatus), stat = "count") +
+  geom_point(aes(y = ..count.., color = plantStatus), stat = "count") +
+  facet_wrap(~ growthForm) +
+  labs(
+    x = "Year",
+    y = "Tree number",
+    color = "Plant Status",
+    title = "Changes in Plant Status and Growth Form Over Time"
+  ) +
+  theme_classic()
+```
+```{r}
+hemlock %>%
+  group_by(subplotID, date, siteID) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = date, y = subplotID)) +
+  geom_tile(aes(fill = n)) +
+  scale_fill_viridis_c() +
+  facet_wrap(~siteID) +
+  labs(
+    x = "Year",
+    y = "Subplot ID",
+    fill = "Number of trees"
+  ) +
+  theme_classic()
+```
+```{r}
+# existence plot for each subplot in each year
+hemlock %>%
+  mutate(year = substr(eventID, 10, 13)) %>%
+  group_by(subplotID, year, siteID) %>%
+  summarize(n = n()) %>%
+  ggplot(aes(x = year, y = subplotID)) +
+  geom_tile(aes(fill = n)) +
+  scale_fill_viridis_c() +
+  facet_wrap(~siteID) +
+  labs(
+    x = "Year",
+    y = "Subplot ID",
+    fill = "Number of trees"
+  ) +
+  theme_classic()
+
+```
+
+## only use 2015 and 2019 where we have most subplot observation
+
+
+
+# generate the species richness data
+```{r}
+# Calculate basal area for each tree
+vst_data <- vst_data %>%
+  mutate(basal_area = (stemDiameter / 200)^2 * pi) # m^2
+
+
+species_list <- vst_data %>%
+  group_by(taxonID, scientificName) %>%
+  summarize(
+  abundance = n()) %>%
+  filter(abundance > 850) 
+
+
+# Summarize data by species and year
+species_summary <- vst_data %>%
+  filter(taxonID %in% species_list$taxonID) %>%
+  group_by(taxonID, scientificName, eventID) %>%
+  summarize(
+    abundance = n(),
+    total_basal_area = sum(basal_area, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = as.numeric(substr(eventID, 10, 13)),
+         site = substr(eventID, 5, 8)) %>%
+  group_by(year, site) %>%
+  mutate(
+    site_abundance = sum(abundance),
+    site_total_basal_area = sum(total_basal_area),
+    .groups = "drop"
+  ) %>%
+  ungroup() %>%
+  mutate(abundance_proportion = abundance / site_abundance,
+         basal_area_proportion = total_basal_area / site_total_basal_area,
+         importance_value = abundance_proportion + basal_area_proportion)
+
+ggplot(species_summary, aes(x = year, y = abundance, color = scientificName)) +
+  # different panel for different site
+  facet_wrap(~site) +
+  geom_point() +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Tree number",
+    color = "Species"
+  ) +
+  theme_classic()
+```
+
+```{r}
+
+ggplot(species_summary, aes(x = year, y = total_basal_area, color = scientificName)) +
+  geom_point() +
+  facet_wrap(~site) +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Basal area (m^2)",
+    color = "Species"
+  ) +
+  theme_classic()
+# Optionally, save the results to a CSV file
+```
+
+```{r}
+ggplot(species_summary, aes(x = year, y = importance_value, color = scientificName)) +
+  geom_point() +
+  facet_wrap(~site) +
+  geom_line() +
+  labs(
+    x = "Year",
+    y = "Importance value",
+    color = "Species"
+  ) +
+  theme_classic()
+```
+
+```{r}
+```
+
+
+

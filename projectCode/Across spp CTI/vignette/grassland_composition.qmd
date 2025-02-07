@@ -1,0 +1,302 @@
+---
+title: 'grassland composition shift'
+embed-resources: true
+author: "Yi Liu"
+date: "`r format(Sys.Date(), '%m/%d/%Y')`"
+format:
+  html:
+    code-folding: show
+    highlight: textmate
+    number-sections: true
+    theme: flatly
+    toc: TRUE
+    toc-depth: 4
+    toc-float:
+      collapsed: false
+      smooth-scroll: true
+---
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+# community composition data
+
+```{r}
+# read in rda data
+load("../data/dat_community.rda")
+
+
+#change all character columns to factor
+observations <- dat_community$obs %>% 
+  mutate_if(is.character, as.factor)
+
+experiment <- dat_community$exp %>% 
+  mutate_if(is.character, as.factor)
+
+species <- unique(c(unique(experiment$species), unique(observations$species)))
+```
+
+
+```{r}
+summary(experiment)
+```
+
+```{r}
+plot_data <- experiment %>% 
+  filter(site == "mclserp", plot == "11") %>%
+  group_by(year) %>%
+  mutate(relative_abu = abund/sum(abund)) %>% 
+  filter(relative_abu > 0.1) %>% 
+  ungroup()
+
+```
+
+```{r}
+summary(observations)
+```
+
+
+
+```{r fig.width=20, fig.height=5}}
+observations %>% 
+  filter(site == "mclserp", plot == "11") %>%
+  group_by(year) %>%
+  mutate(relative_abu = abund/sum(abund)) %>% 
+  filter(relative_abu > 0.05) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year, y = relative_abu, fill = species)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  # make the legend text size smaller
+  theme(legend.text = element_text(size = 6)) +
+  theme(legend.position = "bottom") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+# species phenology data
+```{r}
+library(data.table) # Fast data wrangling capabilities
+
+# Load data
+dat_master <- fread("../Data/specimen data - 1,605 species, 300+ specimens each.csv")
+
+# Create list of species with the sample size of each
+names <- dat_master[ ,.N, by= Accepted_species]
+```
+
+```{r}
+
+
+# Create subset dataset to test Bayesian model
+names <- data.frame(Accepted_species = names$Accepted_species, species_i = 1:nrow(names))
+
+# subset to variables of interest
+dat_test <- dat_master[,.(Accepted_species, AzimuthDOY, Norm_tmean_meanDOY_03m, Dev_tmean_meanDOY_03m)]
+
+
+```
+
+
+```{r}
+# check whether "species" all exist in "names"
+common_speceis <- species %>% 
+  setdiff(dat_test$Accepted_species)
+```
+
+```{r}
+dat_test_focus <- dat_test %>% 
+  filter(Accepted_species %in% species) %>% 
+  rename(species = Accepted_species, anom = Dev_tmean_meanDOY_03m, doy = AzimuthDOY, norm = Norm_tmean_meanDOY_03m) %>% 
+  mutate(yeart = anom+norm)
+```
+
+```{r}
+source("/Users/yia/Documents/phenology-npn-flower-leaf-lag/scripts/function_visionalize_summmary_MLmodel.R")
+
+# Apply the function to each species and store the results
+results <- list()
+unique_species <- unique(dat_test_focus$species)
+
+for (species_name in unique_species) {
+  print(species_name)
+  results[[species_name]] <- analyze_species(dat_test_focus, species_name)
+}
+
+# Combine all summary rows into a single data frame
+summary_results <- bind_rows(lapply(results, function(res) res$summary))
+
+# Save all plots to a single PDF file
+pdf("../data/grass_sensitivity.pdf", width = 8, height = 6)
+for (species_name in unique_species) {
+  print(results[[species_name]]$plot)
+}
+dev.off()
+write.csv(summary_results, "../data/grass_sensitivity.csv", row.names = FALSE)
+```
+
+```{r}
+```
+
+# observation site 
+## prepare temperature data
+```{r}
+
+```
+
+
+
+# experiment
+## community sensitivity level
+```{r}
+summary_results <- read.csv("../data/grass_sensitivity.csv")
+
+species_sensitivity <- summary_results %>% 
+  select(species, norm_estimate,anom_estimate)
+
+test <- experiment %>%
+  left_join(species_sensitivity, by = c("species" = "species")) %>%
+  group_by(site, plot, year, treat) %>%
+  mutate(relative_abu = abund / sum(abund)) %>%
+  filter(!is.na(norm_estimate)) %>%
+  mutate(sum_abu = sum(relative_abu)) %>%
+  filter(sum_abu > 0.9) %>%
+  summarise(sum_abu = sum_abu[1],
+            norm = sum(relative_abu * norm_estimate) / sum_abu,
+            anom = sum(relative_abu * anom_estimate) / sum_abu,
+            .groups = "drop") %>%
+  mutate(T = ifelse(substr(treat, 1, 1) == "T", "Yes", "No"),
+         P = ifelse(substr(treat, 2, 2) == "P", "Yes", "No"),
+         C = ifelse(substr(treat, 3, 3) == "C", "Yes", "No"),
+         N = ifelse(substr(treat, 4, 4) == "N", "Yes", "No"))
+
+```
+
+```{r}
+jrgce <- test %>% filter(site == "jrgce")
+ggplot(jrgce, aes(x = T, y = norm)) +
+  geom_boxplot() +  # Use a boxplot to show distribution of sensitivity
+  facet_grid(P ~ C + N, scales = "free") +  # Control for P, C, and N
+  labs(title = "Sensitivity by T, Controlled for P, C, and N",
+       x = "T",
+       y = "Sensitivity") +
+  theme_minimal()
+```
+
+```{r}
+jrgce %>% 
+  # group_by(plot) %>%
+  # filter(n_distinct(T)>1) %>%
+ggplot(aes(x = year, y = plot)) +
+  geom_point(aes(color = T), size = 4) +  # Color indicates Yes or No for "T"
+  scale_color_manual(values = c("Yes" = "blue", "No" = "red")) +  # Custom colors
+  labs(title = "Presence of 'T' by Year and Plot",
+       x = "Year",
+       y = "Plot",
+       color = "T") +
+  theme_minimal()
+# sites are all no for the fiest year, then it's either always yes or no
+# so we can group by year and compare the changing along time (need to fix the site)
+```
+
+```{r}
+jrgce %>% 
+  group_by(plot) %>%
+  filter(n_distinct(T)>1, n()>1) %>%
+  ggplot(aes(x = year, y = norm,color = plot)) +
+  geom_line() +  # Color indicates Yes or No for "T"
+  
+  theme_minimal()
+```
+
+```{r}
+ggplot(jrgce, aes(x = as.factor(year), y = norm, color = T)) +
+  geom_boxplot() +  # Use a boxplot to show distribution of sensitivity
+  theme_minimal()
+```
+
+```{r}
+ggplot(jrgce, aes(x = as.factor(year), y = anom, color = T)) +
+  geom_boxplot() +  # Use a boxplot to show distribution of sensitivity
+  theme_minimal() +
+  labs(title = "",
+       x = "Year",
+       y = "Sensitivity",
+       color = "Increased Temperature")
+```
+
+```{r}
+test %>% 
+  group_by(site) %>%
+  filter(n_distinct(plot)>1) %>% 
+  ungroup() %>%
+  ggplot(aes(x = year, y = norm, group = plot, color = plot)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site, scales = "free") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r}
+test %>% 
+  group_by(site) %>%
+  filter(n_distinct(plot)>1) %>% 
+  ungroup() %>%
+  ggplot(aes(x = year, y = anom, group = plot, color = plot)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  facet_wrap(~site, scales = "free") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r}
+# Define the range for n
+n_values <- seq(1, 100, by = 1)  # Adjust the range as needed
+
+# Calculate x and p
+x_values <- 0.2 * n_values
+p_values <- (x_values + 0.5) / (n_values + 1)
+
+# Calculate ci
+ci_values <- log(p_values / (1 - p_values))
+
+# Plot ci vs n
+plot(n_values, ci_values, type = "l", col = "blue",
+     xlab = "n", ylab = "ci",
+     main = "Plot of ci vs n")
+```
+
+```{r}
+# Define the range for n and r
+n_values <- seq(1, 100, by = 1)  # Range for n
+r_values <- seq(0.1, 1, by = 0.01)  # Range for r
+
+# Create a matrix to store ci values
+ci_matrix <- matrix(NA, nrow = length(n_values), ncol = length(r_values))
+
+# Calculate ci for each combination of r and n
+for (i in seq_along(n_values)) {
+  for (j in seq_along(r_values)) {
+    n <- n_values[i]
+    r <- r_values[j]
+    x <- r * n
+    p <- (x + 0.2) / (n + 1)
+    ci_matrix[i, j] <- log(p / (1 - p))
+  }
+}
+
+# Create a filled contour plot
+filled.contour(r_values, n_values, t(ci_matrix),
+               color.palette = terrain.colors,
+               xlab = "r", ylab = "n",
+               main = "ci as a function of r and n")
+```
+

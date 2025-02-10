@@ -20,7 +20,7 @@ TODO - load project info
 - Sydne Record (PI): University of Maine, Orono, ME
 - Kai Zhu (Co-PI): University of Michigan, Ann Arbor, MI
 - Eric Sokol (Tech Lead): National Ecological Observatory Network (NEON), Battelle, Boulder, CO
-- ...
+- Rohit Jha (Member): PhD Student, Louisiana State University, Baton Rouge, LA
 - [Link to more detailed bios or profiles if available.]
 
 ## Repository Structure

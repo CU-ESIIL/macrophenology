@@ -34,8 +34,9 @@ require(sf)
 # Import data 
 ## iDigBio
 iDigBio for the focal species can be acquired using the `data_explorationridigbio.R` script. The iDigBio data are unprocessed, meaning they still require the extraction of phenophase characteristics (description, and status -presence/absence) and other spatial information. 
+
 ```{r}
-#read in exotic species data 
+#read in exotic species data
 #Acer palmatum
 ap = read.csv("exotic_Acer_palmatum_usa.csv", header = TRUE)
 #Hymenocallis littoralis
@@ -48,7 +49,7 @@ jr = read.csv("exotic_Juglans_regia_usa.csv", header = TRUE)
 rl = read.csv("exotic_Rubus_laciniatus_usa.csv", header = TRUE)
 
 
-#read in native species data 
+#read in native species data
 #Acer rubrum
 ar = read.csv("native_Acer_rubrum_usa.csv", header = TRUE)
 #Hymenocallis occidentalis
@@ -60,7 +61,6 @@ jn = read.csv("native_Juglans_nigra_usa.csv", header = TRUE)
 #Rubus spectabilis
 rs = read.csv("native_Rubus_spectabilis_usa.csv", header = TRUE)
 ```
-
 
 ## NEON/NPN/Herbarium data 
 The following data file can be found in the (ESIIL Macrophenology Cyverse L1>Across_SDM folder): 
@@ -78,7 +78,6 @@ http://doi.org/10.5066/F78S4N1V.
 phe = read.csv("FocalSpp_OpenFlowers_PA_NeonNpnHerb.csv", header = TRUE)
 ```
 
-
 Let's take a peak into some of the data. Uncomment lines of code that are of interest. 
 ```{r}
 #phe
@@ -93,9 +92,21 @@ names(phe)
 sort(unique(phe$species))
 #Unique years of observation 
 sort(unique(phe$year_rect))
+#unique phenophase status 
+unique(phe$phenophase_status)
 ```
 
 For brevity, lets look at one species for iDigBio 
+```{r}
+#ap
+#View column names 
+names(ap)
+#View the structure of the data
+# str(ap)
+#View data dimensions (row & column numbers)
+# dim(ap)
+```
+
 
 # Wrangling iDigBio
 Function used to apply repetitive column formatting. 
@@ -136,7 +147,7 @@ df = df %>%
   #Adding new columns - some with info that does not apply to iDigBio - but important to other data sources 
   mutate(species = soi, site_id = NA, state = NA, individual_id = NA, 
          phenophase_id = NA, phenophase_description = NA, 
-         phenophase_status = NA, data_name = "iDigBio", DomainID = NA) %>%
+         phenophase_status = -1, data_name = "iDigBio", DomainID = NA) %>%
   #Removing unnecessary columns 
   select(-c(X, month, day))
 
@@ -187,25 +198,45 @@ phe.idb = rbind(phe.exotic, phe.native)
 phe.all = rbind(phe, phe.idb)
 
 #export dataset - uncomment & adjust file pathway as necessary 
-# write.csv(phe.all, file = "FocalSpp_OpenFlowers_NeonNpnHerb_iDigBio.csv", row.names = FALSE)
+# write.csv(phe.all, file = "FocalSpp_OpenFlowers_NeonNpnHerb_iDigBiounprocessed.csv", row.names = FALSE)
 ```
 
+
+```{r}
+#peek into the data - uncomment lines of interest
+#unique data name (akak sources)
+unique(phe.all$data_name)
+#unique species observations 
+sort(unique(phe.all$species))
+#unique annual observations 
+# unique(phe.all$year_rect)
+#unique phenophase status - 1=active, 0=inactive, -1=NA
+unique(phe.all$phenophase_status)
+```
+
+let's remove the absent status for a conservative estimation of sample sizes per species and time period. 
+```{r}
+phe.n0 = phe.all %>%
+  filter(phenophase_status!=0)
+
+unique(phe.n0$phenophase_status)
+```
 
 Here we are interested in two distinct time periods: Historical (1910-1950) and Current (2009-present/2025). Lets view some species and yearly sample sizes. 
 ```{r}
 #all species & years
-phe.all %>% 
-  filter(phenophase_status != 0,year_rect>=1910) %>%
+phe.n0 %>% 
+  filter(year_rect>=1910) %>% 
   count(species)
 
 #historical
-phe.all %>% 
-  filter(phenophase_status != 0, year_rect>=1910, year_rect<=1950) %>%
-  count(native_status)
+phe.n0 %>% 
+  filter(year_rect>=1910, year_rect<=1950) %>%
+  count(species)
 #current
-phe.all %>% 
-  filter(phenophase_status != 0, year_rect>=2009) %>%
-  count(native_status)
+phe.n0 %>% 
+  filter(year_rect>=2009) %>%
+  count(species)
 ```
 
 
@@ -213,10 +244,10 @@ phe.all %>%
 ## Histograms 
 Let's visualize the number of observations across all species and years. 
 ```{r, echo=FALSE, warning=FALSE}
-phe.all %>%
+phe.n0 %>%
   #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since the 1910s 
-  filter(phenophase_status != 0, year_rect>=1910) %>% 
+  filter(year_rect>=1910) %>% 
   #begin plotting 
   ggplot(aes(x= year_rect)) +
     #split plot by native status 
@@ -243,11 +274,11 @@ Now, let's see side-by-side samples sizes for each species pair. For the sake of
 
 #### *Acer spp*  
 ```{r, echo=FALSE, warning=FALSE}
-phe.all %>%
+phe.n0 %>%
   #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since the 1910s 
   #Filter for species pairs 
-  filter(phenophase_status != 0, year_rect>=1910, 
+  filter(year_rect>=1910, 
          species == c("Acer palmatum", "Acer rubrum")) %>% 
   #start plotting 
   ggplot(aes(x= year_rect)) +
@@ -278,10 +309,10 @@ Now, let's see how much each `data_source` contributes to the species sample siz
 ```{r, echo=FALSE, warning=FALSE}
 soi = "Acer rubrum" #species of interest
 
-phe.all %>%
+phe.n0 %>%
   #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since the 1910s 
-  filter(phenophase_status != 0, year_rect>=1910, species ==  soi) %>%
+  filter(year_rect>=1910, species ==  soi) %>%
   ggplot(aes(x= year_rect, fill = data_name)) +
     geom_bar(width = 3.5) + 
     #Manually assign colors to unique data_name values 
@@ -317,7 +348,7 @@ domain.sh = st_read("NEON_Domains_CONUS.shp")
 
 #prepping for the function & mapping 
 #back up df
-df = phe.all
+df = phe.n0
 #remove rows with NAs in lat/long columns
 df = df[!is.na(df$latitude), ]
 df = df[!is.na(df$longitude), ]
@@ -346,7 +377,7 @@ mappin <- function(soi, genus){ #START of map function
   df = phe.sh %>%
     #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations between 1910-1950
-    filter(phenophase_status != 0, year_rect>=1910, year_rect <=1950, 
+    filter(year_rect>=1910, year_rect <=1950, 
          species == soi)
     ##Plotting - Historical 
     #base later is domain map
@@ -377,7 +408,7 @@ mappin <- function(soi, genus){ #START of map function
   df = phe.sh %>%
     #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since 2009 (start of NEON/NPN)
-    filter(phenophase_status != 0, year_rect>=2009, species == soi)
+    filter(year_rect>=2009, species == soi)
     ##Plotting - Current 
     #base later is domain map
     c <- ggplot(st_geometry(domain.sh)) + 

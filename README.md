@@ -42,7 +42,7 @@ Given the sensitivity of plant phenology to environmental change, there is an ur
 ### Virtual Meetings:
 - [Online Meeting Notes](https://docs.google.com/document/d/1zC7sE9oZVcNV3BiOpiuhWAJZK87axyX6O5zWqnekfb4/edit?usp=sharing)
 - [Subgroup Meeting Notes: AcrossSDM](https://docs.google.com/document/d/11nZi2dHREWbGLw_EknZ76j5kcD47XbV_/edit)
-- [Subgroup Meeting Notes: ]
+- [Subgroup Meeting Notes: Across spp CTI subgroup]
 ### In Person Meetings:
 - [July 2024 Meeting Agenda](https://docs.google.com/document/d/1HKELyeLE5Fs02499jGOYWAflqtHGhs1bbA688_mgxNs/edit?tab=t.0)
 - [July 2024 Meeting Notes](https://docs.google.com/document/d/1S9xsDXlZJNVKhyTDMbrnBEsPxUxouK3fEEpjE0Kethw/edit?tab=t.0)

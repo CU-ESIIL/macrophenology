@@ -4,18 +4,31 @@ Welcome to the Macrophenology Working Group repository, part of the Environmenta
 
 ## Our Project
 
-Plant phenology — the seasonal timing of leaf-out, budding, flowering, fruiting, and leaf-off — is the most easily observable and well-documented biological response to climate change. Changes in phenology have many aspects of plants relevant to society (e.g., food security, carbon sequestration, seasonal allergies). Often we need to know where and when these seasonal changes in plants occur, which is challenging given their sensitivity to changes in climate. However, little is known about how plant phenology influences a species’ ability to persist in different locations in the face of climate change, how rare versus common species respond to climate, or how native vs. invasive plants may respond to climate change differently. We will tackle these questions by combining different types of phenological data with species distribution data, which will require access to advanced computing resources. We will use a co-production framework with Indigenous scholars to develop a research approach and products that are needed and of value to their communities. 
+Given the sensitivity of plant phenology to environmental change, there is an urgent need to quantify plant phenological dynamics to better understand and predict this societally important biological phenomenon. For example, berry phenology is important to Indigenous peoples of Alaska, as are the timing of flowering and fruiting of many native species. Various types of data capture information on plant phenology (e.g., community science observations, observatory network data, remotely sensed observations, herbarium specimens); but rarely are these data types integrated. Without such integration, our knowledge of changes in phenology across time and space is limited. For instance, it is unknown how phenological change will affect species distributions and developmental events in ecosystems or if it will differentially favor nonnative species. Such understanding will help predict shifts in species distributions as well as aid in conservation. We will focus on the interaction between phenological shifts and species range shifts in response to climate change, using multiple sources of data and co-production with Indigenous peoples to further knowledge of how climatic change may alter plant phenology and range changes.
 
+*Timeline:* 
+- Workshop #1: In-person, Summer 2024 
+- Workshop #2: Virtual, Spring 2025 
+- Workshop #3: In-person, Fall 2025
+  
 ## Project Proposal
 Here is our [project proposal](https://drive.google.com/file/d/10pyxXbELhVJ2rqKo6sEX-euGA2fmeY3a/view?usp=sharing)
 
 ## Group Members
 
-- **Sydne Record** (PI): University of Maine, Orono, ME
-- **Linda Black Elk** (Co-PI): North American Traditional Indigenous Food Systems (NATIFS), Minneapolis, MN
-- **Kai Zhu** (Co-PI): University of Michigan, Ann Arbor, MI
-- **Eric Sokol** (Tech Lead): National Ecological Observatory Network (NEON), Battelle, Boulder, CO
+- **Sydne Record**: Working Group Co-Leader; Associate Professor, University of Maine
+- **Kai Zhu**: Working Group Co-Leader; Advise the Across spp CTI subgroup; Associate Professor, University of Michigan
+- **Lizbeth Amador**: Co-lead of the Across spp SDM subgroup; Ph.D. candidate, University of Maine Orono 
+- **Rohit Jha**: Co-lead of the Across spp SDM subgroup; Ph.D. student, Louisiana State University, Baton Rouge, LA
+- **Yi Liu**: Co-lead of the Across spp CTI subgroup; Ph.D. candidate, University of Michigan
+- **Betsy von Holle**: Research Associate, George Washington University
+- **Katie Jones**: Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder CO
+- **Daijiang Li**: Assistant Professor, University of Arizona, Tucson, AZ
+- **Eric Sokol**: Working Group Tech Lead; Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder, CO
 
+## Deliverables Plan:
+- [Link to gsheet tracking deliverables](https://docs.google.com/spreadsheets/d/1YVxiqyyGMPf4KYvy3bQl-b1x0D8QNnOkLLXMpHJ2VT4/edit?gid=0#gid=0)
+  
 ## Code Repository
 
 This section of the repository will include all the code developed for the project. You can structure it as follows:
@@ -26,7 +39,13 @@ This section of the repository will include all the code developed for the proje
 
 ## Meeting Notes and Agendas
 
-Meeting notes and agendas will be regularly updated here to keep all group members informed and engaged with the progress and direction of the project.
+### Virtual Meetings:
+- [Online Meeting Notes](https://docs.google.com/document/d/1zC7sE9oZVcNV3BiOpiuhWAJZK87axyX6O5zWqnekfb4/edit?usp=sharing)
+- [Subgroup Meeting Notes: AcrossSDM](https://docs.google.com/document/d/11nZi2dHREWbGLw_EknZ76j5kcD47XbV_/edit)
+- [Subgroup Meeting Notes: ]
+### In Person Meetings:
+- [July 2024 Meeting Agenda](https://docs.google.com/document/d/1HKELyeLE5Fs02499jGOYWAflqtHGhs1bbA688_mgxNs/edit?tab=t.0)
+- [July 2024 Meeting Notes](https://docs.google.com/document/d/1S9xsDXlZJNVKhyTDMbrnBEsPxUxouK3fEEpjE0Kethw/edit?tab=t.0)
 
 ## Contributing to This Repository
 
@@ -39,30 +58,4 @@ We welcome contributions from all group members. To maintain the quality and int
 ## Getting Help
 
 If you encounter any issues or have questions about how to contribute, please refer to the [ESIIL Support Page](https://esiil.org/support) or contact the repository maintainers directly.
-
-## Customize Your Repository
-
-As a new working group, you'll want to make this repository your own. Here's how to get started:
-
-1. **Edit This Readme**: Replace the placeholder content with information about your specific project. Ensure that the introduction, project overview, and objectives clearly reflect your group's research focus.
-
-2. **Update Group Member Bios**: Add details about each group member's expertise, role in the project, and professional background. Include links to personal or professional web pages to foster community engagement and collaboration.
-
-3. **Organize Your Code**: Structure your codebase in a way that is logical and accessible. Use directories and clear naming conventions to make it easy for all members to find and contribute to different parts of the project.
-
-4. **Document Your Data**: Include a data directory with README files explaining the datasets, sources, and any preprocessing steps. This will help new members understand and work with the project's data effectively.
-
-5. **Outline Your Methods**: Create a detailed METHODS.md file where you describe the methodologies, software, and tools you will be using in your research. This transparency will support reproducibility and collaborative development.
-
-6. **Set Up Project Management**: Utilize the 'Issues' and 'Projects' features on GitHub to track tasks, discuss ideas, and manage your workflow. This can help in maintaining a clear view of progress and priorities.
-
-7. **Add a License**: Choose and include an appropriate open-source license for your project, ensuring that the broader community understands how they can use and contribute to your work.
-
-8. **Create Contribution Guidelines**: Establish a CONTRIBUTING.md file with instructions for members on how to propose changes, submit issues, and contribute code.
-
-9. **Review and Merge Workflow**: Decide on a workflow for reviewing and merging changes. Will you use branch protection? Who will have merge privileges? Document this process to avoid confusion.
-
-10. **Establish Communication Channels**: Beyond GitHub, set up additional communication channels like Slack, Discord, or email lists for quick and informal discussions.
-
-Remember, the goal is to make your repository clear, accessible, and useful for all current and future members of your working group. Happy researching!
 

@@ -28,7 +28,7 @@ Given the sensitivity of plant phenology to environmental change, there is an ur
 - **Betsy von Holle**: Research Associate, George Washington University
 - **Katie Jones**: Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder CO
 - **Daijiang Li**: Assistant Professor, University of Arizona, Tucson, AZ
-- **Eric Sokol**: Working Group Tech Lead; Senior Research Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder, CO
+- **Eric Sokol**: Working Group Tech Lead; Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder, CO
 
 ## Deliverables Plan:
 - [Link to gsheet tracking deliverables](https://docs.google.com/spreadsheets/d/1YVxiqyyGMPf4KYvy3bQl-b1x0D8QNnOkLLXMpHJ2VT4/edit?gid=0#gid=0)

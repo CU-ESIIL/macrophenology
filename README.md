@@ -30,6 +30,9 @@ Given the sensitivity of plant phenology to environmental change, there is an ur
 - **Daijiang Li**: Assistant Professor, University of Arizona, Tucson, AZ
 - **Eric Sokol**: Working Group Tech Lead; Senior Research Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder, CO
 
+## Deliverables Plan:
+- [Link to gsheet tracking deliverables](https://docs.google.com/spreadsheets/d/1YVxiqyyGMPf4KYvy3bQl-b1x0D8QNnOkLLXMpHJ2VT4/edit?gid=0#gid=0)
+
 ## Repository Structure
 - **Analysis Code**: Scripts for data analysis, statistical modeling, etc.
 - **Data Processing**: Scripts for cleaning, merging, and managing datasets.

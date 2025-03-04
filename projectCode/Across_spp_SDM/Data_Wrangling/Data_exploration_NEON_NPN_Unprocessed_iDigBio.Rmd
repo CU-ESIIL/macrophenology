@@ -34,14 +34,7 @@ require(sf)
 # Import data 
 See `Data_Harmonizatin.R` to view harmonization of unprocessed iDibBio data with NEON, USA-NPN, and other herbarium.  
 
-```{r, echo=FALSE}
-#TEMP 
-source("C:/Users/lizbeth.amador/Documents/GitHub/NEON_phenology/Amador/2_PhenologyRangeTradeoff/Scripts/File_Directories.R")
-```
-
-
 ```{r}
-#TEMP 
 phe = read.csv(file.path(L2, #object storing folder directory - can remove fil.path(L2 if not needed 
                          "FocalSpp_OpenFlowers_NeonNpnHerb_iDigBiounprocessed.csv"), header = TRUE)
 ```
@@ -71,14 +64,14 @@ Here we are interested in two distinct time periods: Historical (1910-1950) and 
 ```{r}
 #all species & years
 phe.n0 %>% 
-  filter(year_rect>=1915) %>% 
+  filter(year_rect>=1910) %>% 
   count(species)
 ```
 
 ```{r}
 #historical
 phe.n0 %>% 
-  filter(year_rect>=1915, year_rect<=1950) %>%
+  filter(year_rect>=1910, year_rect<=1950) %>%
   count(species)
 ```
 
@@ -92,7 +85,7 @@ phe.n0 %>%
 ```{r}
 #historical
 phe.n0 %>% 
-  filter(year_rect>=1915, year_rect<=1950) %>%
+  filter(year_rect>=1910, year_rect<=1950) %>%
   count(species, data_name)
 ```
 
@@ -115,7 +108,7 @@ phe.n0 %>%
   #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since the 1910s 
   #Filter for species pairs 
-  filter(year_rect>=1915, 
+  filter(year_rect>=1910, 
          species == c("Acer palmatum", "Acer rubrum")) %>% 
   #start plotting 
   ggplot(aes(x= year_rect)) +
@@ -126,7 +119,7 @@ phe.n0 %>%
     #rename x/y axes
     labs(x = "Year of collection", y = "Count") +
     #plot title 
-    ggtitle("historical: 1915 - 1950 | current: 1985 - 2025") +
+    ggtitle("historical: 1910 - 1950 | current: 1985 - 2025") +
     #add vertical lines - represent years of interest 
     geom_vline(xintercept = c(1950, 1985), linetype="dashed", 
                 color = "palevioletred", size=1.25) +
@@ -152,7 +145,7 @@ stakd.hist = function(soi){ #START of function
   phe.n0 %>%
     #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
     #Also, only keep observations since the 1910s 
-    filter(year_rect>=1915, species ==  soi) %>%
+    filter(year_rect>=1910, species ==  soi) %>%
     ggplot(aes(x= year_rect, fill = data_name)) +
       geom_bar(width = 3.5) + 
       #Manually assign colors to unique data_name values 
@@ -303,7 +296,7 @@ mappin <- function(soi, genus){ #START of map function
   df = phe.sh %>%
     #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
   #Also, only keep observations since 2009 (start of NEON/NPN)
-    filter(year_rect>=2009, species == soi)
+    filter(year_rect>=1985, species == soi)
     ##Plotting - Current 
     #base later is domain map
     c <- ggplot(st_geometry(domain.sh)) + 

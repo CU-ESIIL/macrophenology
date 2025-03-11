@@ -1,0 +1,381 @@
+---
+title: "Visualizing data"
+author: "Lizbeth G Amador"
+date: "2025-03-10"
+output: html_document
+---
+
+This script produces some figures to view the spatial-temporal extent of the data. Focal native/non-native species pairs are the following: 
+
+**Non-native** -- **Native**   
+*Acer platanoides* -- *Acer rubrum* 
+*Ilex aquifolium* -- *Ilex decidua*  
+*Juglans regia* -- *Juglans nigra*  
+*Rubus laciniatus* -- *Rubus spectabilis*  
+
+
+# Libraries 
+```{r, warning=FALSE, message=FALSE}
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+#sf - spatial package for mapping 
+if (!requireNamespace("sf", quietly = TRUE)) {
+  install.packages("sf")
+}
+require(sf)
+```
+
+
+# Import data 
+See `09_Harmonise)NEON_NPN_Herb_iDigBio.R` to view harmonization of iDibBio data with NEON, USA-NPN, and other herbarium.  
+
+```{r}
+phe = read.csv("Data/L2/FocalSpp_OpenFlowers_NeonNpnHerb_iDigBio.csv", header = TRUE)
+```
+
+```{r}
+# unique(phe$species)
+phe = phe %>%
+  filter(!species %in% c("Acer palmatum", "Acer saccharum", "Hymenocallis littoralis", "Hymenocallis occidentalis"))
+```
+
+
+```{r}
+#peek into the data - uncomment lines of interest
+#unique data name (akak sources)
+unique(phe$data_name)
+#unique species observations 
+sort(unique(phe$species))
+#unique annual observations 
+# unique(phe.all$year_rect)
+#unique phenophase status - 1=active, 0=inactive, -1=NA
+unique(phe$phenophase_status)
+```
+
+
+Here we are interested in two distinct time periods: Historical (1910-1950) and Current (1985-present/2025). Lets view some species and yearly sample sizes. 
+```{r}
+#all species & years
+phe %>% 
+  filter(year_rect>=1910) %>%
+  count(species, phenophase_status)
+```
+
+```{r}
+#historical
+phe %>% 
+  filter(year_rect>=1910, year_rect<=1950) %>%
+  count(species, phenophase_status)
+```
+
+```{r}
+#current
+phe %>% 
+  filter(year_rect>=1985) %>%
+  count(species, phenophase_status)
+```
+
+```{r}
+#historical
+phe %>% 
+  filter(year_rect>=1910, year_rect<=1950) %>%
+  count(species, data_name, phenophase_status)
+```
+
+```{r}
+#current
+phe %>% 
+  filter(year_rect>=1985) %>%
+  count(species, data_name, phenophase_status)
+```
+
+
+# Figures  
+## Histograms 
+### Non-native & Native Pairs
+Now, let's see side-by-side samples sizes for each species pair. For the sake of brevity, we provided one example but the same code chunk ca nbe applied to each species pair. Remember to adjust the species filter and the file name!
+
+#### *Acer spp*  
+```{r, warning=FALSE}
+phe %>%
+  #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
+  #Also, only keep observations since the 1910s 
+  #Filter for species pairs 
+  filter(year_rect>=1910, phenophase_status == 1, 
+         species == c("Acer platanoides", "Acer rubrum")) %>% 
+  #start plotting 
+  ggplot(aes(x= year_rect)) +
+    #split plot by native status
+    facet_wrap(~native_status) +
+    #adjust the bar width
+    geom_bar(width = 1.5) + 
+    #rename x/y axes
+    labs(x = "Year of collection", y = "Count") +
+    #plot title 
+    ggtitle("historical: 1910 - 1950 | current: 1985 - 2025") +
+    #add vertical lines - represent years of interest 
+    geom_vline(xintercept = c(1950, 1985), linetype="dashed", 
+                color = "palevioletred", size=1.25) +
+    theme_light()
+
+#########
+# # Save the plot in the specified directory
+#   ggsave(file.path(out.path, plot_Acer_pairs_Annualhist.png"), last_plot(),
+#          width = 8, units = "in", dpi = 600) #dpi the resolution
+```
+
+
+### Data source contributions 
+Now, let's see how much each `data_source` contributes to the species sample size. Remember to uncomment the exporting code at the end if you'd like to save the plots.
+
+```{r, warning=FALSE}
+#Function to automate plotting 
+#inputs:
+# soi: character; species of interest
+#------------------------------
+
+stakd.hist = function(soi){ #START of function 
+  #if statement to automatically install libraries if absent in r library
+  #tidyverse - mainly for data wrangling & plotting/mapping
+  if (!requireNamespace("patchwork", quietly = TRUE)) {
+    install.packages("patchwork")
+  }
+  library(patchwork) #for plot stacking at the end 
+
+  # Plots - Absent flowers 
+  a <- phe %>%
+    #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
+    #Also, only keep observations since the 1910s 
+    filter(year_rect>=1910, species ==  soi, phenophase_status == 0) %>%
+    ggplot(aes(x= year_rect, fill = data_name)) +
+      geom_bar(width = 3.5) + 
+    # facet_wrap(~phenophase_status) +
+      #Manually assign colors to unique data_name values 
+      scale_fill_manual(values=c("Herbarium" = "goldenrod2", 
+                                 "NEON"= "turquoise4",
+                                 "USA-NPN" = "grey", 
+                                 "iDigBio" = "grey46")) +
+      guides(fill = FALSE) + # turns off legend
+      #rename x/y axes
+      labs(x = "Year of collection", y = "Count", fill = "Data source") +
+      #plot title 
+      ggtitle(paste0(soi, ": Flowers Absent")) +
+      #opacity of the colors 
+      scale_alpha_manual(values=c(0.7,0.7,0.7)) +
+      #vertical lines - represents time periods 
+      geom_vline(xintercept = c(1950, 1985), linetype="dashed", 
+                  color = "palevioletred", size=1.5)
+  
+  
+  p <- phe %>%
+    #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
+    #Also, only keep observations since the 1910s 
+    filter(year_rect>=1910, species ==  soi, phenophase_status == 1) %>%
+    ggplot(aes(x= year_rect, fill = data_name)) +
+      geom_bar(width = 3.5) + 
+    # facet_wrap(~phenophase_status) +
+      #Manually assign colors to unique data_name values 
+      scale_fill_manual(values=c("Herbarium" = "goldenrod2", 
+                                 "NEON"= "turquoise4",
+                                 "USA-NPN" = "grey", 
+                                 "iDigBio" = "grey46")) +
+      # guides(fill = FALSE) + # turns off legend 
+      #rename x/y axes
+      labs(x = "Year of collection", y = "", fill = "Data source") +
+      #plot title 
+      ggtitle(paste0(soi, ": Flowers Present")) +
+      #opacity of the colors 
+      scale_alpha_manual(values=c(0.7,0.7,0.7)) +
+      #vertical lines - represents time periods 
+      geom_vline(xintercept = c(1950, 1985), linetype="dashed", 
+                  color = "palevioletred", size=1.5)
+  
+  
+  #arrange plots 
+  a|p
+  
+  #########
+  #Export plots - ucomment when needed
+  
+  # Save the plot in the specified directory
+  # ggsave(file.path(out.path, paste0("plot_",
+  #               gsub(" ", "_", soi), #grep-like function to include the specific species name & adding a "_" in any spaces
+  #               "_Annualhist_alldata",
+  #               ".png")), last_plot(), #png file type
+  #        width = 8, units = "in", dpi = 600) #dpi the resolution
+
+  } #END of function 
+```
+
+#### *Acer rubrum* 
+```{r, warning=FALSE}
+stakd.hist("Acer rubrum")
+```
+
+#### *Acer platanoides*  
+```{r, warning=FALSE}
+stakd.hist("Acer platanoides")
+```
+
+#### *Ilex decidua*  
+```{r, warning=FALSE}
+stakd.hist("Ilex decidua")
+```
+
+#### *Ilex aquifolium*  
+```{r, warning=FALSE}
+stakd.hist("Ilex aquifolium")
+```
+
+#### *Juglans nigra*  
+```{r, warning=FALSE}
+stakd.hist("Juglans nigra")
+```
+
+#### *Juglans regia*  
+```{r, warning=FALSE}
+stakd.hist("Juglans regia")
+```
+
+#### *Rubus spectabilis*  
+```{r, warning=FALSE}
+stakd.hist("Rubus spectabilis")
+```
+
+#### *Rubus laciniatus*  
+```{r, warning=FALSE}
+stakd.hist("Rubus laciniatus")
+```
+
+
+## Maps 
+Let's see the spatial spread of the observations. The NEON domain map shapefile use is from the [NEON web](https://www.neonscience.org/data-samples/data/spatial-data-maps). Also found in the Cyverse L1 data folder   
+```{r}
+#import NEON domain maps - can be found on NEON website
+domain.sh = st_read(file.path(domain, "NEON_Domains_CONUS.shp"))
+
+#prepping for the function & mapping 
+#back up df
+df = phe
+#remove rows with NAs in lat/long columns
+df = df[!is.na(df$latitude), ]
+df = df[!is.na(df$longitude), ]
+#Convert the `phe.data` into a sf vector object ("point shapefile") for mapping 
+phe.sh = st_as_sf(df, coords = c("longitude", "latitude"), crs = st_crs(domain.sh)) #this function gets grumpy if lat/long columns have NAs
+```
+
+Let's create a function to for the repetitive mapping. 
+```{r}
+#Function to spatially map observations 
+#inputs: soi = species of interest, genus = genus info
+#outputs: saved png image 
+#---------------------------------
+mappin <- function(soi, genus){ #START of map function 
+
+  #if statement to automatically install libraries if absent in r library
+  #tidyverse - mainly for data wrangling & plotting/mapping
+  if (!requireNamespace("patchwork", quietly = TRUE)) {
+    install.packages("patchwork")
+  }
+  library(patchwork) #for plot stacking at the end 
+
+  
+  ##HISTORICAL
+  #Making temp df name for historical 
+  df = phe.sh %>%
+    #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
+  #Also, only keep observations between 1910-1950
+    filter(year_rect>=1910, year_rect <=1950, phenophase_status == 1,
+         species == soi)
+    ##Plotting - Historical 
+    #base later is domain map
+    h <- ggplot(st_geometry(domain.sh)) + 
+      #aesthetics for base layer
+      geom_sf(fill='grey95', color='grey30')+ #adjusting the polygon & line colors
+      #Mapping next layer - points based on species (1 species)
+      geom_sf(data = df, mapping = aes(color = species)) +
+      #split into two maps for native status
+      facet_wrap(~native_status) + 
+      #Manually change the color of the points 
+      scale_color_manual(values= c("dodgerblue", "darkgreen"))+ #order: non-native, native
+      #Adjust the plot window / axes limits 
+      coord_sf(ylim = c(25, 50), xlim = c(-123, -69)) + 
+      #Axes labels 
+      labs(title = expression("Historical Observations"),
+           x = "Longitude",
+           y = "Latitude") +
+      #theme voide removes everything but map
+      theme_void() + 
+      #Adjust theme aesthetics 
+      theme(legend.position = "none", 
+            plot.title = element_text(size = 26, hjust=0.5)) #legend position, plot title font size & position
+  
+
+  ##CURRENT
+  #Making temp df name for current 
+  df = phe.sh %>%
+    #remove any inactive phenophase status (i.e. 0s) - want to be conservative and only view sample sizes for active flowering status
+  #Also, only keep observations since 2009 (start of NEON/NPN)
+    filter(year_rect>=1985, species == soi)
+    ##Plotting - Current 
+    #base later is domain map
+    c <- ggplot(st_geometry(domain.sh)) + 
+      #aesthetics for base layer
+      geom_sf(fill='grey95', color='grey30')+ # #B9E0A5 (light green)
+      #Mapping next layer - points based on species (1 species)
+      geom_sf(data = df, mapping = aes(color = species)) +
+      #split into two maps for native status
+      facet_wrap(~native_status) +
+      #Manually change the color of the points 
+      scale_color_manual(values= c("dodgerblue", "darkgreen"))+ #order: non-native, native
+      # scale_shape_manual(values=c(16)) + 
+      # scale_size_manual(values= 10) +
+      #Adjust the plot window / axes limits 
+      coord_sf(ylim = c(25, 50), xlim = c(-123, -69)) + 
+      #Axes labels 
+      labs(title = expression("Current Observations"),
+           x = "Longitude",
+           y = "Latitude") +
+      #theme voide removes everything but map
+      theme_void() + 
+      #Adjust theme aesthetics 
+      theme(legend.position = "none", 
+            plot.title = element_text(size = 26, hjust=0.5)) #legend position, plot title font size & position
+    
+  
+  #using patchwork library to stack the two plots 
+  h/c
+  
+  
+  #########
+  # Exporting maps - uncomment and rerun function to save maps
+
+  # Save the plot in the specified directory
+  # ggsave(file.path(out.path, paste0("Map_", genus, "_pairs.png")),
+  # last_plot(),
+  # width = 8, units = "in", dpi = 600) #dpi the resolution
+} #END of map function 
+```
+
+Apply the function to each species pair. iDigBio data will be missing lots of geolocation info, as expected since they are unprocessed.  
+```{r, warning=FALSE, message=FALSE}
+#Acer spp
+mappin(soi = c("Acer rubrum", "Acer platanoides"), genus = "Acer")
+#Ilex spp
+mappin(soi = c("Ilex decidua", "Ilex aquifolium"), genus = "Ilex")
+#Juglans spp
+mappin(soi = c("Juglans nigra", "Juglans regia"), genus = "Juglans")
+#Rubus spp
+mappin(soi = c("Rubus spectabilis", "Rubus laciniatus"), genus = "Rubus")
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+#<empty on purpose>
+```
+

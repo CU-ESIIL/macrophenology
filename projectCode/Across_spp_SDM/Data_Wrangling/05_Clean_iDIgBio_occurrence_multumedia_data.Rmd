@@ -1,0 +1,219 @@
+---
+title: "iDigBio Occurence & Multimedia Clean"
+author: "Lizbeth G Amador"
+date: "2025-02-21"
+output: html_document
+---
+
+
+Directory presets 
+```{r}
+#Data folder directory 
+data.dir = "/Data/L0/iDigBio/02_merged_occur_multimed"
+#Export folder 
+output.folder = "/Data/L0/iDigBio/03_merged_occur_multimed_NoNA"
+```
+
+Read in function
+```{r, warning=FALSE, message=FALSE}
+source("05a_idigbio.multimed.clean.R")
+```
+
+
+These merged files have both occurrence and multimedia data. 
+
+Check for two things:
+- Go through their **canonical name (Scientific name) column** 
+  - Most will be the same as the species name i.e. Acer palmatum or Acer rubrum for respective csv. However, few might have just genus names, and few might have sub-species names too.  You can **filter** to get those **rows that have both genus and species in the canonical names**
+- **Filter** to get the observations from the **target years**  
+- **Filter** for the columns to **remove rows that have missing values** for **date and geo-locations**
+
+
+Once you have refined csv, you can remove the old one and upload those. I will then try downloading the images in bulk and putting them in the framework of ImageAnt.
+
+
+# *Rubus laciniatus*
+Read in data 
+```{r}
+#Rubus laciniatus
+rl = read.csv(file.path(data.dir, "Rubus/merged_Rubus_laciniatus.csv"), header = TRUE)
+
+```
+
+Conical name
+```{r}
+unique(rl$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(rl, "rubus laciniatus", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Rubus spectabilis*
+Read in data 
+```{r}
+#Rubus spectabilis
+rs = read.csv(file.path(data.dir, "Rubus/merged_Rubus_spectabilis.csv"), header = TRUE)
+
+```
+
+Conical name: rubus spectabilis 
+```{r}
+unique(rs$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(rs, "rubus spectabilis", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+
+# *Juglans regia*
+Read in data 
+```{r}
+#Juglans regia
+jr = read.csv(file.path(data.dir, "Juglans/merged_Juglans_regia.csv"), header = TRUE)
+
+```
+
+Conical name
+```{r}
+unique(jr$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(jr, "juglans regia", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+# *Juglans nigra*
+Read in data 
+```{r}
+#Juglans nigra
+jn = read.csv(file.path(data.dir, "Juglans/merged_Juglans_nigra.csv"), header = TRUE)
+
+```
+
+Conical name 
+```{r}
+unique(jn$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(jn, "juglans nigra", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Ilex aquifolium*
+Read in data 
+```{r}
+#Ilex aquifolium
+ia = read.csv(file.path(data.dir, "Ilex/merged_Ilex_aquifolium.csv"), header = TRUE)
+
+```
+
+Conical name 
+```{r}
+unique(ia$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(ia, "ilex aquifolium", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Ilex decidua*
+Read in data 
+```{r}
+#Acer platanoides
+id = read.csv(file.path(data.dir, "Ilex/merged_Ilex_decidua.csv"), header = TRUE)
+
+```
+
+Conical name 
+```{r}
+unique(id$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(id, "ilex decidua", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Acer platanoides*
+Read in data 
+```{r}
+#Acer platanoides
+apl = read.csv(file.path(data.dir, "Acer/merged_Acer_platanoides.csv"), header = TRUE)
+
+```
+
+Conical name 
+```{r}
+unique(apl$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(apl, "acer platanoides", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Acer rubrum*
+Read in data 
+```{r}
+#Acer rubrum
+ar = read.csv(file.path(data.dir, "Acer/merged_Acer_rubrum.csv"), header = TRUE)
+```
+
+Conical name: acer rubrum
+```{r}
+unique(ar$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(ar, "acer rubrum", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+# *Acer palmatum*
+Read in data 
+```{r}
+#Acer palmatum
+ap = read.csv(file.path(data.dir, "Acer/merged_Acer_palmatum.csv"), header = TRUE)
+```
+
+Conical name: acer palmatum 
+```{r}
+unique(ap$gbif.canonicalName)
+```
+
+Apply function 
+```{r}
+idigbio.multimed.clean(ap, "acer palmatum", #take note of spelling in chunk above 
+                       output.folder)
+```
+
+
+
+
+
+
+
+
+

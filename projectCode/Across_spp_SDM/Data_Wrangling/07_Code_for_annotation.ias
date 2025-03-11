@@ -1,0 +1,11 @@
+main_tasks:
+ - text: 'Does the image show a plant with flowers?'
+   variable: 'flowers'
+   responses:
+      - text: '"p": flowers present'
+        action: 'keypress{p ~ Y}'
+      - text: '"a": flowers absent'
+        action: 'keypress{a ~ N}'
+      - text: '"u": uncertain'
+        action: 'keypress{u ~ U}'
+

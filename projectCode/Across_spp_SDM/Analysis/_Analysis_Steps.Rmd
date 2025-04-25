@@ -1,0 +1,36 @@
+---
+title: 'ESIIL Macrophenolgoy: Across spp SDM analysis'
+author: "Lizbeth G Amador"
+date: "2025-04-09"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Steps towards running analysis for across spp sdm working group. The following steps outlined are paired with the name of the script associated with that step. 
+
+**Phenology:**  
+1. Process Data -- Pre-process data for phenology, species occurence, and climate.  
+
+2. Formatting data -- Format data to fit into biomod (includes spatial-temporal thinning and pivots) 
+
+3. NA
+
+4. Modeling -- Use `biomod2` to run single models, ensemble test and final models 
+
+5. Calculate differences -- Find the difference between the raster outputs for the two time periods 
+
+
+**Species Occurrence:**  
+1. Process Data -- Pre-process data for phenology, species occurence, and climate.  
+
+2. Formatting data -- Format data to fit into biomod (includes spatial-temporal thinning and pivots) 
+
+3 psuedo-absences -- Create pseudo-absences for historical occurrence data (presence-only) 
+
+4. Modeling -- Use `biomod2` to run single models, ensemble test and final models 
+
+5. Calculate differences -- Find the difference between the raster outputs for the two time periods 
+

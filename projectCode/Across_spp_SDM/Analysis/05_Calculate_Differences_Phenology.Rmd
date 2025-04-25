@@ -1,0 +1,91 @@
+---
+title: "05 Calculate Differences"
+author: "Lizbeth G Amador"
+date: "2025-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Presets 
+```{r}
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+#terra - spatial package 
+if (!requireNamespace("terra", quietly = TRUE)) {
+  install.packages("terra")
+}
+require(terra)
+
+#tidyterra - spatial package for mapping 
+if (!requireNamespace("tidyterra", quietly = TRUE)) {
+  install.packages("tidyterra")
+}
+require(tidyterra)
+
+```
+
+Directories 
+```{r}
+#ESIIL Macrophenology group - for saving 
+main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+L2 = file.path(main.dir, "Data/L2")
+```
+
+
+```{r}
+em.h = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_H.tif"))
+em.c = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_C.tif"))
+```
+
+
+```{r}
+plot(em.h, main = "Acer rubrum - Historical")
+
+plot(em.c, main = "Acer rubrum - Current")
+```
+
+```{r}
+#saving - uncomment to save
+#Historical
+# png(file = file.path(L2, paste0("EMcaBYTSS_FProj_Hist_", today, ".png")), 
+#     width = 8, height = 7, units = "in", res = 600)
+# try(plot(em.h, main = "Acer rubrum - Historical"))
+# dev.off()
+# 
+# #Current
+# png(file = file.path(L2, paste0("EMcaBYTSS_FProj_Cur_", today, ".png")), 
+#     width = 8, height = 7, units = "in", res = 600)
+# try(plot(em.c, main = "Acer rubrum - Current"))
+# dev.off()
+```
+
+
+```{r}
+em.dif = em.c - em.h
+
+plot(em.dif, main = "Change in the probability of Flowering")
+```
+
+
+
+```{r}
+#Saving - uncomment to save
+# png(file = file.path(L2, paste0("EMFProj_diff_", today, ".png")), 
+#     width = 8, height = 7, units = "in", res = 600)
+# try(plot(em.dif, main = "Change in the probability of Flowering"))
+# dev.off()
+```
+
+
+
+

@@ -1,0 +1,613 @@
+---
+title: 'Step 1: Process Data'
+author: "Lizbeth G Amador"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+pre-process data for phenology, species occurence, and climate.   
+
+# Presets 
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE}
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+#terra - spatial package 
+if (!requireNamespace("terra", quietly = TRUE)) {
+  install.packages("terra")
+}
+require(terra)
+
+#sf - spatial package (required for some computational packages) 
+if (!requireNamespace("sf", quietly = TRUE)) {
+  install.packages("sf")
+}
+require(sf)
+
+#tidyterra - spatial package for mapping 
+if (!requireNamespace("tidyterra", quietly = TRUE)) {
+  install.packages("tidyterra")
+}
+require(tidyterra)
+
+
+#usdm -- colinearity stuff 
+if (!requireNamespace("usdm", quietly = TRUE)) {
+  install.packages("usdm")
+}
+require(usdm)
+
+#rFIA -- to download FIA data
+if (!requireNamespace("rFIA", quietly = TRUE)) {
+  install.packages("rFIA")
+}
+library(rFIA)
+
+#BIEN - to download species range maps and data 
+if (!requireNamespace("BIEN", quietly = TRUE)) {
+  install.packages("BIEN")
+}
+library(BIEN)
+
+#data.table - alternatives to read.csv and friends  
+if (!requireNamespace("data.table", quietly = TRUE)) {
+  install.packages("data.table")
+}
+library(data.table)
+
+#CoordinateCleaner -- to clean coordinates by multiple tests 
+if (!requireNamespace("CoordinateCleaner", quietly = TRUE)) {
+  install.packages("CoordinateCleaner")
+}
+require(CoordinateCleaner)
+```
+
+Directories 
+```{r}
+#Liz's personal direct -- data also found on Cyverse 
+L1 = "G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L1"
+L1.ppt = "G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L1/PRISM/ppt" 
+L1.temp = "G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L1/PRISM/temp"
+# L2 = "G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L2"
+```
+
+```{r}
+#ESIIL Macrophenology group - for saving 
+main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+L2 = file.path(main.dir, "Data/L2")
+```
+
+
+
+**1. Process data  **
+
+Pre-process the climate data and the phenological data to prepare for analysis.  
+
+
+# Climate Data  
+## i. Precipitation 
+```{r}
+#precipitation 
+#annual spring averages
+ppt.asa = rast(file.path(L1.ppt, #object saving directory 
+                         "prism_ppt_Annual_SpringAvg.tif"))
+```
+
+Split the annual spring averages between historical and current. 
+```{r}
+#annual spring averages - historic 
+ppt.asah = ppt.asa[[1:41]]
+#annual spring averages - current 
+ppt.asac = ppt.asa[[42:81]]
+```
+
+
+## ii. Temperature 
+```{r}
+#temperature
+#annual spring averages 
+temp.asa = rast(file.path(L1.temp, #object saving directory
+                          "prism_temp_Annual_Spring_Avg.tif"))
+```
+
+Split the annual spring averages between historical and current. 
+```{r}
+#annual spring averages - historic 
+temp.asah = temp.asa[[1:41]]
+#annual spring averages - current 
+temp.asac = temp.asa[[42:80]]
+```
+
+
+### Reproject 
+Let's make sure the precipitation and temperature rasters are in the same projection! Note: precipitation/temperature rasters were calculated in their respective workflows, so within temp/precip groups are the same projection. 
+```{r}
+crs(ppt.asa) == crs(temp.asa)
+```
+
+The precipitation and temperature data are not in the same projection so we will reproject them. 
+```{r}
+temp.asa <- project(temp.asa, #raster we want to reproject
+                                 crs(ppt.asa)) #reference raster
+
+temp.asah <- project(temp.asah, #raster we want to reproject
+                                 crs(ppt.asa)) #reference raster
+
+temp.asac <- project(temp.asac, #raster we want to reproject
+                                 crs(ppt.asa)) #reference raster 
+```
+
+```{r}
+#double checking 
+crs(temp.asah) == crs(ppt.asa)
+```
+
+```{r}
+#import study area - CONUS 
+conus = vect(file.path(L1, #object saving directory
+                       "NEON_Domains_CONUS.shp"), crs = crs(ppt.asa))
+
+#check that phe.sh and conus have same crs
+# crs(conus) == crs(ppt.asa)
+
+#save with reprojection
+writeVector(conus, file.path(L2, #object saving directory 
+                             "conus.shp"))
+```
+
+```{r}
+#Checking to see if they overlap well
+plot(ppt.asa[[1]])
+plot(conus, add = TRUE)
+```
+
+Great! Now the climate data have been distinguished between the two time periods and are in the same projection.
+
+
+## iiii. Raster stacks 
+We will summarise all years within each variable (i.e. mean annual averages & mean annual anomalies). After that we will stack the climate variables for each respective time period to use in the modeling.  
+```{r}
+#Precipitation 
+#Historical annual spring avg -- ppt
+ppt.asah.avg = app(ppt.asah, mean, na.rm = TRUE)
+#Current annual spring avg -- ppt
+ppt.asac.avg = app(ppt.asac, mean, na.rm = TRUE)
+
+
+#Temperature 
+#Historical annual spring avg -- temp
+temp.asah.avg = app(temp.asah, mean, na.rm = TRUE)
+#Current annual spring avg -- temp
+temp.asac.avg = app(temp.asac, mean, na.rm = TRUE)
+
+```
+
+Average across years for both time periods to get the overall average (i.e. normals). We have the precipitation and temperature for all years already, from the very beginning when reading in the climate data. We will use this to calculate anomalies for each time period.  
+```{r}
+#ppt avg 
+ppt.avg = app(ppt.asa, mean, na.rm = TRUE)
+#temp avg 
+temp.avg = app(temp.asa, mean, na.rm = TRUE)
+```
+
+Calculate anomalies 
+```{r}
+#ppt 
+#historical
+ppt.anom.hist = ppt.asah.avg - ppt.avg
+#current 
+ppt.anom.cur = ppt.asac.avg - ppt.avg
+
+#temp
+#historical
+temp.anom.hist = temp.asah.avg - temp.avg
+#current 
+temp.anom.cur = temp.asac.avg - temp.avg
+```
+
+Combining all the time period specific variables together 
+```{r}
+#Historical 
+clim.h = c(ppt.asah.avg, ppt.anom.hist, temp.asah.avg, temp.anom.hist)
+#Changing column names 
+names(clim.h) <- c("ppt.avg", "ppt.anom", "temp.avg", "temp.anom")
+
+#Current  
+clim.c = c(ppt.asac.avg, ppt.anom.cur, temp.asac.avg, temp.anom.cur)
+#Changing column names 
+names(clim.c) <- c("ppt.avg", "ppt.anom", "temp.avg", "temp.anom")
+```
+
+```{r}
+plot(clim.h)
+plot(clim.c)
+```
+
+```{r, echo=FALSE}
+# #uncomment to save 
+# graph.out = "./Graphs"
+# png(file = file.path(graph.out, "Map_Historical_ClimateStack.png"))
+# plot(clim.h)
+# dev.off()
+# 
+# #current 
+# png(file = file.path(graph.out, "Map_Current_ClimateStack.png"))
+# plot(clim.c)
+# dev.off()
+```
+
+
+
+## iv. Colinearity 
+
+Predictor climate variables are often highly correlated, and modeling with correlated variables can lead to inaccurate results, so we will remove those with the highest variance inflation factor (VIF), a measure of variable correlation.
+
+### Historic 
+```{r}
+# Now we will remove those variables from consideration that have a high VIF.
+envs.vif <- usdm::vifstep(clim.h)
+envs.rem <- envs.vif@excluded
+clim.h <- clim.h[[!(names(clim.h) %in% envs.rem)]]
+#check the rasters inside
+names(clim.h)
+```
+
+```{r, include=FALSE}
+plot(clim.h[[1]], main = names(clim.h[[1]]))
+```
+
+### Current 
+```{r}
+# Now we will remove those variables from consideration that have a high VIF.
+envs.vif <- usdm::vifstep(clim.c)
+envs.rem <- envs.vif@excluded
+clim.c <- clim.c[[!(names(clim.c) %in% envs.rem)]]
+#check the rasters inside
+names(clim.c)
+```
+
+```{r, include=FALSE}
+plot(clim.c[[1]], main = names(clim.c[[1]]))
+```
+
+
+Removing extra spatRast/Vect obj from enviro data -- takes up too much memory 
+```{r}
+rm(list = ls(pattern = c("^temp", "^ppt"))) #^ only search for strings beginning with the pattern 
+```
+
+```{r}
+#save the climate data - so we don't have to run again for other scripts  
+#historic
+writeRaster(clim.h, file = file.path(L2, #object saving directory
+                                     "ClimRastS_H_cleaned.tif"))
+#current 
+writeRaster(clim.c, file = file.path(L2, #object saving directory
+                                     "ClimRastS_C_cleaned.tif"))
+```
+
+# Phenology Data 
+Now we will read in the phenological data 
+```{r}
+#import phenology data 
+phe = read.csv(file.path(L2, #object saving directory
+                         "FocalSpp_OpenFlowers_NeonNpnHerb_iDigBio.csv"), header = TRUE)
+```
+
+Let's clean up the data frame 
+
+Here we want to make sure the data points fall within the CONUS extent.
+```{r}
+#Making sure observations fall within CONUS extent 
+#turn into a point vector 
+phe.sh = vect(phe, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+plot(conus, main = "All Phenological Observations"); plot(phe.sh, add=TRUE)
+
+phe.sh = phe.sh %>% 
+  select(-DomainID)
+
+#drop any points outside of conus shapefile 
+phe.int = intersect(phe.sh, conus)
+plot(conus, main="All Phenological Obs: Post intersect"); plot(phe.int, add=TRUE)
+
+#revert back to a dataframe 
+phe.conus = as.data.frame(phe.int)
+```
+
+We will now limit species to those we are interested in. 
+```{r}
+#remove extra species 
+phe.conus = phe.conus %>%
+  filter(!species %in% c("Acer saccharum", "Hymenocallis occidentalis", 
+                         "Ilex aquifolium", "Acer palmatum", "Juglans regia", 
+                         "Hymenocallis littoralis")) %>% 
+  dplyr::select(latitude, longitude, day_of_year, year_rect, native_status, 
+                species, phenophase_status, data_name) 
+
+```
+
+Let's split the data into the two time periods.  
+```{r}
+#Historical
+phe.hist = phe.conus %>%
+  filter(year_rect >= 1910, year_rect <= 1950)
+#Current 
+phe.cur = phe.conus %>%
+  filter(year_rect >= 1985)
+```
+
+```{r}
+#save objects 
+save(phe.hist, phe.cur, file = file.path(L2, "phenology_timeperiods.RData"))
+#to import 
+# load(file.path(L2, "phenology_timeperiods.RData"), verbose = TRUE)
+```
+
+
+
+# Species Occurrence 
+
+## Reference dataset
+Here we will adjust `phe.conus` to reflect the species occurrence aspect of the study. Since we are focused on the individual of the species.  
+
+```{r}
+rang = phe.conus %>% 
+  select(-c(phenophase_status, day_of_year))
+
+names(rang)
+```
+
+## FIA data 
+FIA Citation:
+Stanke, Hunter; Finley, Andrew O.; Weed, Aaron S.; Walters, Brian F.; Domke, Grant M. 2020. rFIA: An R package for estimation of forest attributes with the US Forest Inventory and Analysis database. Environmental Modelling & Software. 127(9): 104664. https://doi.org/10.1016/j.envsoft.2020.104664. 
+
+
+Setting options, directories, and downloading FIA data 
+```{r, messages = FALSE}
+#Adjust global timeout 
+options(timeout=3600)
+
+#Automatically make FIA folder for current directory 
+#Define a FIA directory path
+fia_dir <- file.path(getwd(), "FIA")
+# Check if the folder exists — if not, create it
+if (!dir.exists(fia_dir)) {
+  dir.create(fia_dir)
+  message("Created FIA directory at: ", fia_dir)
+} else {
+  message("Using existing FIA directory at: ", fia_dir)
+}
+
+#list of state codes 
+allstates = c("AK", "AL", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", 'NJ', "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+
+#Get species FIA Data - will take a while to load!
+getFIA(
+  states = allstates,
+  dir = file.path(fia_dir), #FIA folder directory where .csv will be saved  
+  # tables = "PLOT",
+  load = FALSE #do you want to store in R? otherwise downloads data 
+)
+```
+
+The for loop below is set up to just calculate data from all states and save a single csv for each state. -- *Code adapted from Adam Eichenwald* 
+```{r}
+#for loop to parse through FIA data for all states and exports indv
+for (state in allstates){ #START of loop
+  
+  #Optional: Message to keep track of states being processed 
+  message(paste("Processing", state, "...")) 
+  
+  #1. Load FIA data for the state - see code chunk above for how to download data
+  FIAdb <- readFIA(
+    dir = fia_dir, #FIA folder directory to where all the .csv files stored
+    inMemory = FALSE, 
+    ncores = 8, 
+    states = state)
+  
+  #2. Estimate trees per acre 
+  TPA <- tpa(
+    db = FIAdb,
+    byPlot = TRUE,
+    nCores = 8,
+    bySpecies = TRUE) %>%
+    mutate(PLT_CN = as.character(PLT_CN))
+  
+  #3. Read the corresponding plot file 
+  plot_path <- list.files(
+  fia_dir, #FIA folder directory 
+  pattern = paste0(state, "_PLOT.csv"), 
+  full.names = TRUE) 
+  
+  #Optional: in case there's no data 
+ if (length(plot_path) == 0) { #START of if
+  message(paste("No plot file found for", state, "- skipping"))
+  next
+ } #END of if 
+  
+  #Reading [state]_PLOT.csv
+  plot_file <- fread(plot_path[1])
+  
+  #4. Join plot with TPA data to PLOT file 
+  state_plot <- plot_file %>%
+    select(CN, LON, LAT) %>%
+    distinct() %>%
+    mutate(PLT_CN = as.character(CN)) %>%
+    data.frame() %>%
+    inner_join(TPA, by = "PLT_CN") %>%
+    rename(Trees_per_acre = TPA) %>% 
+    mutate(state = state) #optional: adds a "state" column
+  
+  #6. Export result for this state
+  output_path <- file.path(fia_dir, paste0(state, "_FIASpecies", ".csv"))
+  fwrite(state_plot, output_path)
+   
+} #End of loop
+```
+
+```{r}
+#Combine all processed states 
+# Get all output CSVs that start with "_FIASpecies_"
+FIAall <- list.files(
+  path = fia_dir, #FIA folder directory with saved .csv
+  pattern = "_FIASpecies\\.csv$",  # Regex: match files ending with "_FIASpecies.csv"
+  full.names = TRUE
+) %>%
+  lapply(fread) %>%
+  rbindlist()
+
+#Optional: Save combined output
+fwrite(FIAall, file.path(fia_dir, "_FIASpecies_ALL.csv"))
+
+#Preview combined result
+print(head(FIAall))
+names(FIAall)
+```
+
+
+We will need the columns that match with `phe.range`columns ("latitude", "longitude"     "year_rect", "native_status" "species", "data_name"). This will facilitate data merging.  
+```{r}
+fia.sp = FIAall %>%
+  select("LON", "LAT", "YEAR", "SCIENTIFIC_NAME") %>%
+  rename(longitude = LON, latitude = LAT, year_rect = YEAR, species = SCIENTIFIC_NAME) %>%
+  filter(species %in% c("Acer rubrum", "Acer platanoides", "Juglans nigra",
+                        "Ilex decidua", "Rubus spectabilis", "Rubus laciniatus")) %>%
+  mutate(data_name = "FIA", native_status = NA)
+```
+
+```{r}
+unique(fia.sp$species)
+sort(unique(fia.sp$year_rect))
+```
+
+```{r}
+#Plot observations - uncomment 
+# rang.sh = vect(fia.sp, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+# plot(conus, main = "All Phenological Observations"); plot(rang.sh, add=TRUE)
+```
+
+
+```{r}
+#save 
+write.csv(fia.sp, file = file.path(L1, "FIA_focal_species_occurrence.csv"))
+```
+
+
+## BIEN data 
+```{r}
+#vector of focal species 
+species = c("Acer rubrum", "Acer platanoides", "Juglans nigra", "Ilex decidua", 
+            "Rubus spectabilis", "Rubus laciniatus")
+
+traitslist = BIEN_trait_list() #Lists all available types of trait
+```
+
+```{r, messages = FALSE}
+#Returns all occurrence records for a specified species
+bien = BIEN_occurrence_species(species = species, 
+                                  native.status = TRUE, 
+                                  observation.type = TRUE) 
+```
+
+Here we want to make sure the data points fall within the CONUS extent.
+```{r}
+#Making sure observations fall within CONUS extent 
+#turn into a point vector 
+bien.sh = vect(bien, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+
+plot(conus, main = "All Occurence Observations"); plot(bien.sh, add=TRUE)
+
+#drop any points outside of conus shapefile 
+bien.int = intersect(bien.sh, conus)
+plot(conus, main="All Occurrence Obs: Post intersect"); plot(bien.int, add=TRUE)
+
+#revert back to a dataframe 
+bien.conus = as.data.frame(bien.int)
+
+#save 
+write.csv(bien.conus, file = file.path(L1, "BIEN_focal_species_occurrence_conus.csv"))
+```
+
+Lets see where these data are from: 
+```{r}
+#see unique instances of data sources and such - unccoment to see
+bien.datsource = bien.conus %>%
+  select(datasource, dataset, dataowner, datasource_id) %>%
+  distinct()
+```
+
+This BIEN data includes observations from GBIF (and iNaturalist), and other consortiums!
+
+We will need the columns that match with `phe.range`columns ("latitude", "longitude"     "year_rect", "native_status" "species", "data_name"). This will facilitate data merging. 
+```{r}
+#Pull year from date 
+bien.conus$year_rect = format(as.Date(bien.conus$date_collected, format="%Y-%m-%d"),"%Y")
+
+#Select columns & rename 
+bien.sp = bien.conus %>%
+  rename(species = scrubbed_species_binomial, data_name = datasource) %>%
+  mutate(native_status = "native") %>% 
+  select(latitude, longitude, year_rect, native_status, species, data_name)
+  
+```
+
+
+## Merge all occurrence data 
+
+```{r}
+#Uncomment 
+#Check that all cloumns are the same class  
+str(rang)
+str(fia.sp)
+str(bien.sp)
+
+#What's up with bien.shp year_rect
+# unique(bien.sp$year_rect)
+#How many NAs
+# sum(is.na(bien.sp$year_rect))
+```
+
+```{r}
+#Remove rows with NAs in year_rect column 
+bien.sp = bien.sp[!is.na(bien.sp$year_rect),]
+sum(is.na(bien.sp$year_rect))
+```
+
+
+```{r}
+rang.all = rbind(rang, fia.sp, bien.sp)
+```
+
+Filter for time periods of interest
+```{r}
+#Historical
+rang.hist = rang.all %>%
+  filter(year_rect >= 1910, year_rect <= 1950)
+#Current 
+rang.cur = rang.all %>%
+  filter(year_rect >= 1985)
+```
+
+```{r}
+plot(rang.hist$longitude, rang.hist$latitude, main="Historical Occurrence Observations")
+plot(rang.cur$longitude, rang.cur$latitude, main="Comtemporary Occurrence Observations")
+```
+
+
+
+```{r}
+#save objects 
+save(rang.hist, rang.cur, file = file.path(L2, "range_timeperiods.RData"))
+#to import 
+# load(file.path(L2, "range_timeperiods.RData"), verbose = TRUE)
+```

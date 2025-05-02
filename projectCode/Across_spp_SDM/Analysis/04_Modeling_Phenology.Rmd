@@ -1,0 +1,881 @@
+---
+title: "Modeling"
+author: "Lizbeth G Amador"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Use `biomod2` to run single models, ensemble test and final models. 
+
+# Presets 
+```{r, warning=FALSE, message=FALSE}
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+#terra - spatial package 
+if (!requireNamespace("terra", quietly = TRUE)) {
+  install.packages("terra")
+}
+require(terra)
+
+#tidyterra - spatial package for mapping 
+if (!requireNamespace("tidyterra", quietly = TRUE)) {
+  install.packages("tidyterra")
+}
+require(tidyterra)
+
+#biomod2 - ensemble modeling
+if (!requireNamespace("biomod2", quietly = TRUE)) {
+  install.packages("biomod2")
+}
+require(biomod2)
+
+#earth - ensemble modeling - For MARS model
+if (!requireNamespace("earth", quietly = TRUE)) {
+  install.packages("earth")
+}
+require(earth)
+
+#randomForest - ensemble modeling - For RF model
+if (!requireNamespace("randomForest", quietly = TRUE)) {
+  install.packages("randomForest")
+}
+require(randomForest)
+
+#ggtext - for biomod2 plotting 
+if (!requireNamespace("ggtext", quietly = TRUE)) {
+  install.packages("ggtext")
+}
+require(ggtext)
+```
+
+Directories 
+```{r}
+#ESIIL Macrophenology group - for saving 
+main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+L2 = file.path(main.dir, "Data/L2")
+#ensemble folder for phenology 
+L2.em = file.path(L2, "ensemble/Phenology")
+```
+
+Data
+```{r}
+#load biomod objects 
+load(file.path(L2, "phenology_timeperiods_cleaned.RData"), verbose = TRUE)
+#read climate rasters 
+clim.h = rast(file.path(L2, #object saving directory
+                                     "ClimRastS_H_cropped.tif"))
+clim.c = rast(file.path(L2, #object saving directory
+                                     "ClimRastS_C_cropped.tif"))
+```
+
+# Historic 
+
+## i. **`biomod2` formatting** 
+
+We will be modeling the phenology for each species individually. We will filter for each species and then format the data for `biomod2`. 
+
+Note (03/21/2024): Focusing on *Acer rubrum* to start. 
+
+```{r}
+#Historical 
+#Select species name
+myRespName.h = 'Acer rubrum'
+# Get corresponding P/A data
+myResp.h = phe.hw[, myRespName.h]
+#Get corresponding coordinates
+myRespXY.h = as.data.frame(phe.hw[, c('longitude', 'latitude')]) #Make sure long goes first!
+```
+
+Format data with true absences in `biomod2`
+```{r}
+#Historical 
+bmdat.h = BIOMOD_FormatingData(
+  resp.name = myRespName.h, #species name
+  resp.var = myResp.h, #presences-absences
+  resp.xy = myRespXY.h, #lat/lon
+  expl.var = clim.h #raster stack 
+)
+
+#save object 
+# save(bmdat.h, file = file.path(L2, "bmdat_h.RData"))
+
+#biomod data summary 
+print(bmdat.h)
+#spatial description of data 
+plot(bmdat.h)
+```
+
+
+## ii. Cross validation 
+```{r}
+#Historic
+# k-fold selection
+cv.k.h <- bm_CrossValidation(bm.format = bmdat.h, #Formatted biomod data 
+                           strategy = "kfold", #validation strategy - various 
+                           nb.rep = 2, #number of repitions
+                           k = 3) # number of split datasets of equivalent sizes 
+
+head(cv.k.h)
+summary(bmdat.h, calib.lines = cv.k.h)
+plot(bmdat.h, calib.lines = cv.k.h)
+```
+
+```{r}
+#get today's date 
+# today = format(Sys.Date(), format = "%Y%m%d")
+# 
+# #save as pdf
+# pdf(file.path(L2, #object saving file directory 
+#               paste0("bmdat_cv_k_h_", today, ".pdf")))
+# 
+# try(plot(bmdat.h, calib.lines = cv.k.h))
+# 
+# dev.off()
+```
+
+
+
+Some other ways below
+```{r}
+# # stratified selection (geographic)
+# cv.s <- bm_CrossValidation(bm.format = bmdat.h,
+#                            strategy = "strat",
+#                            k = 2,
+#                            balance = "presences",
+#                            strat = "x")
+# head(cv.s)
+```
+
+
+## iii.Modeling
+
+see [site](https://biomodhub.github.io/biomod2/reference/ModelsTable.html)  
+Model options:  
+
+|   |model  |type     |model descriptions                           |package| 
+|:--|:-----:|:-------:|:--------------------------------------------|:------| 
+|1  |ANN|binary|Fit Neural Networks                          |nnet| 
+|2  |CTA|binary|Recursive Partitioning and Regression Trees  |rpart| 
+|3  |FDA|binary|Flexible Discriminant Analysis               |mda| 
+|4  |GAM|binary|General Additive Model                       |gam| 
+|5  |GAM|binary|General Additive Model                       |mgcv| 
+|6  |GAM|binary|General Additive Model                       |mgcv| 
+|7  |GBM|binary|Generalized Boosted Regression Modeling (GBM)|gbm |   
+|8  |GLM|binary|General Linear Model                         |stats| 
+|9  |MARS|binary|Multivariate Adaptive Regression Splines     |earth| 
+|10 |MAXENT|binary|Maximum Entropy                              |MAXENT| 
+|11 |MAXNET|binary|Maximum Entropy                              |manet| 
+|12 |RF|binary|Random Forest                                |randomForest| 
+|13 |SRE|binary|Surface Range Envelope                       |biomod2| 
+|14 |XGBOOST|binary|eXtreme Gradient Boosting Training           |xboost| 
+
+
+
+### Single models 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Need to dowload the packages for the desired models before running models - see table above 
+mods = c("CTA", "GBM", "GLM", "MARS", "RF", "SRE")
+# Model single models
+myBiomodModelOut.h <- BIOMOD_Modeling(bm.format = bmdat.h, #formatted biomod data
+                                    models = mods, #for simulation set
+                                    CV.strategy = 'kfold', #cross-validation strategy 
+                                    CV.nb.rep = 2, #cross-val repititions
+                                    CV.k = 3, #cross-val partitions 
+                                    OPT.strategy = 'bigboss', #model param selection
+                                    var.import = 3, #number of permutations to est var importance  
+                                    seed.val = 1, #to keep same results when rerunning
+                                    # nb.cpu = 8), #computing resources
+                                    metric.eval = c('TSS','ROC')) #evaluation metrics 
+                                   
+
+#view output 
+myBiomodModelOut.h
+```
+
+```{r}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Get evaluation scores & variables importance - uncomment to see 
+# get_evaluations(myBiomodModelOut.h)
+# get_variables_importance(myBiomodModelOut.h)
+```
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent evaluation scores & variables importance
+bm_PlotEvalMean(bm.out = myBiomodModelOut.h)
+
+bm_PlotEvalBoxplot(bm.out = myBiomodModelOut.h, group.by = c('algo', 'algo'))
+
+bm_PlotEvalBoxplot(bm.out = myBiomodModelOut.h, group.by = c('algo', 'run'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.h, group.by = c('expl.var', 'algo', 'algo'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.h, group.by = c('expl.var', 'algo', 'run'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.h, group.by = c('algo', 'expl.var', 'run'))
+```
+
+
+Seems like Random Forest (RF) was the best, followed by Generalised Boosted Models (GBM), and then CTA. 
+
+Overall, ppt.avg was the most important variable across all models 
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent response curves
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.h, 
+                      models.chosen = get_built_models(myBiomodModelOut.h)[c(1:3, 12:14)], fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.h, 
+                      models.chosen = get_built_models(myBiomodModelOut.h)[c(1:3, 12:14)], fixed.var = 'min')
+```
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Response Curves heat map 
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.h, 
+                      models.chosen = get_built_models(myBiomodModelOut.h)[3],
+                      fixed.var = 'median',
+                      do.bivariate = TRUE)
+```
+
+
+Make a vector of the best scoring models
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+## choose high scoring models (calibration)
+modeleval<-myBiomodModelOut.h@models.evaluation
+
+#Create a new data frame with stuff 
+modelevaldataset<- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]], modeleval@val[["metric.eval"]], modeleval@val[["validation"]], modeleval@val[["calibration"]])
+  
+#Filter based on a TSS threshold 
+bestmodelscal <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS") %>%  
+  filter(modeleval.val...calibration... >= 0.7) # select models that had TSS over 0.6, done by Carroll et al. 
+# upped to 0.7 b/c why not? more robust?
+
+#Peep into the remaining models 
+unique(bestmodelscal$modeleval.val...algo...)
+  
+  
+#Plot 
+ggplot(bestmodelscal)+
+  geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
+```
+
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+##choose high scoring models (validation)
+
+#Histrogram 
+hist(modelevaldataset$modeleval.val...validation...) # some do hit over 0.7. Oh, but this includes everything..
+  
+#Pull only the TSS metric 
+TSS_val <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS")
+
+#Histrogram 
+hist(TSS_val$modeleval.val...validation...) # max is just above 0.6
+bestmodelsval <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS") %>%
+  filter(modeleval.val...validation... > 0.5) # select models that had TSS over 0.5, lower than Carroll but i think she used calibration data 
+# upped to 0.7 b/c why not? more robust?
+
+#Peep into the remaining models 
+unique(bestmodelsval$modeleval.val...algo...)
+
+#Plot 
+ggplot(bestmodelsval)+ 
+  geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
+  
+```
+
+Aw dang, well we are intreasted in predicting what has already happened and not in new places -- using to predict 
+
+
+Let's save the best models from the calibration! 
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+## best models
+bestmods <- c("CTA", "GBM", "RF")
+
+#calibration 
+filt.cal<- bestmodelscal %>% 
+  filter(modeleval.val...algo...%in% bestmods)
+#validation
+filt.val <- bestmodelsval %>% 
+  filter(modeleval.val...algo...%in% bestmods)
+
+#full names of best models 
+bestmodsfullnames.h = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
+bestmodsfullnames.h
+```
+
+
+ 
+
+### Ensemble model: Testing
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Model ensemble models
+myBiomodEM.h <- BIOMOD_EnsembleModeling(bm.mod = myBiomodModelOut.h, #singles model output
+                                      models.chosen = bestmodsfullnames.h, #vector of best models
+                                      em.by = 'all', #what models will be combined to ensemble
+                                      em.algo = c('EMmean', 'EMcv', 'EMci', 'EMmedian', 'EMca', 'EMwmean'), #types of ensembles models to be computed 
+                                      metric.select = c('TSS'),
+                                      # metric.select.thresh = c(0.7), #don't need this bc double filtering 
+                                      metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
+                                      var.import = 3, #num permutationsto est var importance
+                                      EMci.alpha = 0.05, #significance level 
+                                      EMwmean.decay = 'proportional') #relative importance of weights 
+
+#Print results 
+myBiomodEM.h
+```
+
+
+```{r}
+#get today's date -  uncomment to save 
+# today = format(Sys.Date(), format = "%Y%m%d")
+# 
+# ##save biomodout file
+# saveRDS(myBiomodEM.h, file = file.path(L2, myBiomodEM.h@sp.name, 
+#                                      paste0("biomodensemble_Acer_rubrum_hist_out_", today, ".rds")))
+```
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Get evaluation scores & variables importance - can save these as csv
+evalensemble <- get_evaluations(myBiomodEM.h)
+varimpensemble <- get_variables_importance(myBiomodEM.h)
+
+  
+#Extract kept models in the ensemble
+kept_models <- get_kept_models(myBiomodEM.h)
+  
+print(kept_models)
+```
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent evaluation scores & variables importance
+bm_PlotEvalMean(bm.out = myBiomodEM.h, group.by = 'full.name')
+bm_PlotEvalBoxplot(bm.out = myBiomodEM.h, group.by = c('full.name', 'full.name'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.h, group.by = c('expl.var', 'full.name', 'full.name'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.h, group.by = c('expl.var', 'algo', 'merged.by.run'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.h, group.by = c('algo', 'expl.var', 'merged.by.run'))
+```
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Response cirves heat map
+bm_PlotResponseCurves(bm.out = myBiomodEM.h, 
+                      models.chosen = get_built_models(myBiomodEM.h)[7],
+                      fixed.var = 'median',
+                      do.bivariate = TRUE)
+```
+
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent response curves
+bm_PlotResponseCurves(bm.out = myBiomodEM.h, 
+                      models.chosen = get_built_models(myBiomodEM.h)[c(1, 6, 7)],
+                      fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodEM.h, 
+                      models.chosen = get_built_models(myBiomodEM.h)[c(1, 5, 6)],
+                      fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodEM.h, 
+                      models.chosen = get_built_models(myBiomodEM.h)[c(1, 6, 7)],
+                      fixed.var = 'min')
+
+```
+
+
+### Ensemble model: Final  
+ 
+Projecting across space using initial ensemble outputs and pre-moeling data. 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# project species - will pick best one
+sp_projection.h <- BIOMOD_EnsembleForecasting(myBiomodEM.h, #output from ensemble 
+                                  proj.name = myRespName.h, #species name
+                                  new.env = clim.h, #enviro matrix
+                                  new.env.xy = myRespXY.h,
+                                  models.chosen = "all")
+plot(sp_projection.h)
+#spits lots of rasters 
+```
+
+```{r, message=FALSE}
+#Saving plots - uncomment to save
+# png(file = file.path(L2, paste0("EMFProj_all_Historical_", today, ".png")), width=8, height=7, units="in", res=600)
+# try(plot(sp_projection.h))
+# dev.off()
+```
+
+
+Choose the ensemble model (one) that looks the 'best' to you and re-run on its own - Here we chose the EMca by TSS 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+EMcaTSS.h <- BIOMOD_EnsembleForecasting(myBiomodEM.h,
+                                              proj.name = myRespName.h,
+                                              new.env = clim.h,
+                                              new.env.xy = myRespXY.h,
+                                              models.chosen = "Acer.rubrum_EMcaByTSS_mergedData_mergedRun_mergedAlgo") #EMca by TSS run - to choose how to ensemble them #spits one raster 
+
+plot(EMcaTSS.h)
+```
+ 
+  
+  
+### Maps 
+```{r, warning=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#read raster output 
+r = rast(EMcaTSS.h@proj.out@link)
+#write ouput with new name -- will be overwritten by the current timeperiod model since the species share the same name 
+writeRaster(r, 
+            file = file.path(L2, paste0(
+  gsub("\\.", "_", EMcaTSS.h@sp.name), 
+  "_FinalEnsemble_H_Phenology.tif")), overwrite = TRUE)
+```
+
+
+
+# Current 
+## i. **`biomod2` formatting** 
+
+
+```{r}
+#Current 
+#Select species name
+myRespName.c = "Acer rubrum"
+# Get corresponding P/A data
+myResp.c = phe.cw[, myRespName.c]
+#Get corresponding coordinates
+myRespXY.c = as.data.frame(phe.cw[, c('longitude', 'latitude')]) #Make sure long goes first!
+```
+
+
+Format data with true absences in `biomod2`
+```{r}
+#Historical 
+bmdat.c = BIOMOD_FormatingData(
+  resp.name = myRespName.c, #species name
+  resp.var = myResp.c, #presences-absences
+  resp.xy = myRespXY.c, #lat/lon
+  expl.var = clim.c #raster stack 
+)
+
+#save object 
+# save(bmdat.c, file = file.path(L2, "bmdat_c.RData"))
+
+
+#biomod data summary 
+print(bmdat.c)
+#spatial description of data 
+plot(bmdat.c)
+```
+
+
+## ii. Cross Validation 
+```{r}
+#Current 
+# k-fold selection
+cv.k.c <- bm_CrossValidation(bm.format = bmdat.c, #Formatted biomod data 
+                           strategy = "kfold", #validation strategy - various 
+                           nb.rep = 2, #number of repitions
+                           k = 3) # number of split datasets of equivalent sizes 
+
+head(cv.k.c)
+summary(bmdat.c, calib.lines = cv.k.c)
+plot(bmdat.c, calib.lines = cv.k.c)
+```
+
+```{r}
+#get today's date  - uncomment if you want to save 
+# today = format(Sys.Date(), format = "%Y%m%d")
+# 
+# #save as pdf
+# pdf(file.path(L2, #object with file directory 
+#               paste0("bmdat_cv_k_c_", today, ".pdf")))
+# 
+# try(plot(bmdat.c, calib.lines = cv.k.c))
+# 
+# dev.off()
+```
+
+
+## iii. Modeling 
+### Single models 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Models of interest 
+mods = c("CTA", "GBM", "GLM", "MARS", "RF", "SRE")
+# Model single models
+myBiomodModelOut.c <- BIOMOD_Modeling(bm.format = bmdat.c, #formatted biomod data
+                                    models = mods, #for simulation set
+                                    CV.strategy = 'kfold', #cross-validation strategy 
+                                    CV.nb.rep = 2, #cross-val repititions
+                                    CV.k = 3, #cross-val partitions 
+                                    OPT.strategy = 'bigboss', #model param selection
+                                    var.import = 3, #number of permutations to est var importance 
+                                    seed.val = 2, #to keep same results when rerunning
+                                    # nb.cpu = 8) #computing resources
+                                    metric.eval = c('TSS','ROC')) #evaluation metrics 
+                                    
+
+#view output 
+myBiomodModelOut.c
+```
+
+```{r}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Get evaluation scores & variables importance -- uncomment to see 
+# get_evaluations(myBiomodModelOut.c)
+# get_variables_importance(myBiomodModelOut.c)
+```
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent evaluation scores & variables importance
+bm_PlotEvalMean(bm.out = myBiomodModelOut.c)
+
+bm_PlotEvalBoxplot(bm.out = myBiomodModelOut.c, group.by = c('algo', 'algo'))
+
+bm_PlotEvalBoxplot(bm.out = myBiomodModelOut.c, group.by = c('algo', 'run'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.c, group.by = c('expl.var', 'algo', 'algo'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.c, group.by = c('expl.var', 'algo', 'run'))
+
+bm_PlotVarImpBoxplot(bm.out = myBiomodModelOut.c, group.by = c('algo', 'expl.var', 'run'))
+```
+
+
+Seems like Random Forest (RF) was the best, followed by Generalised Boosted Models (GBM), and then CTA. 
+
+Overall, ppt.avg was the most important variable across all models, followed by temp.avg 
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent response curves
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.c, 
+                      models.chosen = get_built_models(myBiomodModelOut.c)[c(1:3, 12:14)], fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.c, 
+                      models.chosen = get_built_models(myBiomodModelOut.c)[c(1:3, 12:14)], fixed.var = 'min')
+
+bm_PlotResponseCurves(bm.out = myBiomodModelOut.c, 
+                      models.chosen = get_built_models(myBiomodModelOut.c)[3],
+                      fixed.var = 'median',
+                      do.bivariate = TRUE)
+```
+
+
+Make a vector of the best models
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+## choose high scoring models (calibration)
+modeleval<-myBiomodModelOut.c@models.evaluation
+
+#Create a new data frame with stuff 
+modelevaldataset<- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]], modeleval@val[["metric.eval"]], modeleval@val[["validation"]], modeleval@val[["calibration"]])
+  
+#Filter based on a TSS threshold 
+bestmodelscal <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS") %>%  
+  filter(modeleval.val...calibration... >= 0.7) # select models that had TSS over 0.6, done by Carroll et al. (ASK JILL FOR CITATION)
+# upped to 0.7 b/c why not? more robust?
+
+#Peep into the remaining models 
+unique(bestmodelscal$modeleval.val...algo...)
+  
+  
+#Plot 
+ggplot(bestmodelscal)+
+  geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
+```
+
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+##choose high scoring models (validation)
+
+#Histrogram 
+hist(modelevaldataset$modeleval.val...validation...) # some do hit over 0.7. Oh, but this includes everything..
+  
+#Pull only the TSS metric 
+TSS_val <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS")
+
+#Histrogram 
+hist(TSS_val$modeleval.val...validation...) # max is just above 0.6
+bestmodelsval <- modelevaldataset %>% 
+  filter(modeleval.val...metric.eval...== "TSS") %>%
+  filter(modeleval.val...validation... > 0.5) # select models that had TSS over 0.5, lower than Carroll but i think she used calibration data 
+# upped to 0.7 b/c why not? more robust?
+
+#Peep into the remaining models 
+unique(bestmodelsval$modeleval.val...algo...)
+
+#Plot 
+ggplot(bestmodelsval)+ 
+  geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
+  
+```
+
+
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+## best models
+bestmods <- c("RF")
+
+#calibration 
+filt.cal<- bestmodelscal %>% 
+  filter(modeleval.val...algo...%in% bestmods)
+#validation
+filt.val <- bestmodelsval %>% 
+  filter(modeleval.val...algo...%in% bestmods)
+
+#full names of best models 
+bestmodsfullnames.c = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
+bestmodsfullnames.c 
+```
+
+
+
+
+### Ensemble modeling: Testing 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Model ensemble models
+myBiomodEM.c <- BIOMOD_EnsembleModeling(bm.mod = myBiomodModelOut.c, #singles model output
+                                      models.chosen = bestmodsfullnames.c, #vector of best models
+                                      em.by = 'all', #what models will be combined to ensemble
+                                      em.algo = c('EMmean', 'EMcv', 'EMci', 'EMmedian', 'EMca', 'EMwmean'), #types of ensembles models to be computed 
+                                      metric.select = c('TSS'),
+                                      # metric.select.thresh = c(0.7), #don't need this bc double filtering 
+                                      metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
+                                      var.import = 3, #num permutationsto est var importance
+                                      EMci.alpha = 0.05, #significance level 
+                                      EMwmean.decay = 'proportional') #relative importance of weights 
+
+
+#Print results 
+myBiomodEM.c
+
+```
+
+
+```{r}
+#get today's date - uncomment to save 
+# today = format(Sys.Date(), format = "%Y%m%d")
+# 
+# ##save biomodout file
+# saveRDS(myBiomodEM.c, file = file.path(L2, myBiomodEM.c@sp.name, 
+#                                      paste0("biomodensemble_Acer_rubrum_cur_out_", today, ".rds")))
+```
+
+```{r, message=FALSE}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Get evaluation scores & variables importance - can save these as csv
+evalensemble <- get_evaluations(myBiomodEM.c)
+varimpensemble <- get_variables_importance(myBiomodEM.c)
+
+  
+#Extract kept models in the ensemble
+kept_models <- get_kept_models(myBiomodEM.c)
+  
+print(kept_models)
+```
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent evaluation scores & variables importance
+bm_PlotEvalMean(bm.out = myBiomodEM.c, group.by = 'full.name')
+bm_PlotEvalBoxplot(bm.out = myBiomodEM.c, group.by = c('full.name', 'full.name'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.c, group.by = c('expl.var', 'full.name', 'full.name'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.c, group.by = c('expl.var', 'algo', 'merged.by.run'))
+bm_PlotVarImpBoxplot(bm.out = myBiomodEM.c, group.by = c('algo', 'expl.var', 'merged.by.run'))
+```
+
+
+
+
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#Response curve         
+bm_PlotResponseCurves(bm.out = myBiomodEM.c, 
+                      models.chosen = get_built_models(myBiomodEM.c)[7],
+                      fixed.var = 'median',
+                      do.bivariate = TRUE)
+```
+
+  
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# Represent response curves
+# Represent response curves
+bm_PlotResponseCurves(bm.out = myBiomodEM.c, 
+                      models.chosen = get_built_models(myBiomodEM.c)[c(1, 6, 7)],
+                      fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodEM.c, 
+                      models.chosen = get_built_models(myBiomodEM.c)[c(1, 5, 6)],
+                      fixed.var = 'median')
+
+bm_PlotResponseCurves(bm.out = myBiomodEM.c, 
+                      models.chosen = get_built_models(myBiomodEM.c)[c(1, 6, 7)],
+                      fixed.var = 'min')
+
+```
+
+  
+### Ensemble Model: Final 
+
+Projecting across space using initial ensemble outputs and pre-moeling data. 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+# project species - will pick best one
+sp_projection.c <- BIOMOD_EnsembleForecasting(myBiomodEM.c, #output from ensemble 
+                                  proj.name = myRespName.c,#species name
+                                  new.env = clim.c, #enviro matrix
+                                  new.env.xy = myRespXY.c,
+                                  models.chosen = "all")
+plot(sp_projection.c)
+#spits lots of rasters 
+```
+
+```{r}
+#Saving plots - uncomment to save 
+# png(file = file.path(L2, paste0("EMFProj_all_Current_", today, ".png")), width = 8, height = 7, units = "in", res=600)
+# try(plot(sp_projection.c))
+# dev.off()
+```
+
+
+Choose the ensemble model (one) that looks the 'best' to you and re-run on its own - Here we chose the EMca by TSS 
+```{r, message=FALSE, results='hide'}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+EMcaTSS.c <- BIOMOD_EnsembleForecasting(myBiomodEM.c,
+                                              proj.name = myRespName.c,
+                                              new.env = clim.c,
+                                              new.env.xy = myRespXY.c,
+                                              # binary.meth = "TSS", #how values of output being saved
+                                              models.chosen = "Acer.rubrum_EMcaByTSS_mergedData_mergedRun_mergedAlgo", #weighted mean TSS run - to choose how to ensemble them #spits one raster  
+                                       ) 
+
+plot(EMcaTSS.c)
+```
+ 
+
+
+### Maps 
+
+[https://biomodhub.github.io/biomod2/articles/vignette_presentation.html]
+
+```{r}
+#set working directory - biomod2 automatically creates a folder 
+setwd(L2.em)
+
+#read raster output 
+r = rast(EMcaTSS.c@proj.out@link)
+#write ouput with new name -- will be overwritten by the current timeperiod model since the species share the same name 
+writeRaster(r, 
+            file = file.path(L2, paste0(
+  gsub("\\.", "_", EMcaTSS.c@sp.name), 
+  "_FinalEnsemble_C_Phenology.tif")), overwrite = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

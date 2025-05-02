@@ -1,0 +1,556 @@
+---
+title: 'Step 2: Format Data'
+author: "Lizbeth G Amador"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Format data to fit into `biomod2` (includes spatial-temporal thinning and pivots). Phenological data are presence and absence, occurrence data are presence only and will require pseudo-absences. 
+
+
+# Presets 
+```{r, warning=FALSE, message=FALSE}
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+#terra - spatial package
+if (!requireNamespace("terra", quietly = TRUE)) {
+  install.packages("terra")
+}
+require(terra)
+
+#sf - spatial package
+if (!requireNamespace("sf", quietly = TRUE)) {
+  install.packages("sf")
+}
+require(sf)
+
+#BIEN - species range & occurrence 
+if (!requireNamespace("BIEN", quietly = TRUE)) {
+  install.packages("BIEN")
+}
+require(BIEN)
+
+#tidyterra - spatial package for mapping
+if (!requireNamespace("tidyterra", quietly = TRUE)) {
+  install.packages("tidyterra")
+}
+require(tidyterra)
+```
+
+Directories 
+```{r}
+#ESIIL Macrophenology group - for saving 
+main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+L2 = file.path(main.dir, "Data/L2")
+```
+
+
+# Climate Data 
+Read in the data: 
+```{r}
+#read climate rasters 
+clim.h = rast(file.path(L2, #object saving directory
+                                     "ClimRastS_H_cleaned.tif"))
+clim.c = rast(file.path(L2, #object saving directory
+                                     "ClimRastS_C_cleaned.tif"))
+
+#conus 
+conus = vect(file.path(L2, "conus.shp"))
+```
+
+
+```{r}
+#Check crs 
+crs(conus) == crs(clim.h)
+#if not use this 
+conus <- project(conus, #raster we want to reproject
+                                crs(clim.h)) #reference raster
+#Check crs 
+crs(conus) == crs(clim.h)
+```
+
+
+## Spatial Constraints 
+For the climate data, we only need to crop the extent to that of the species BIEN range. 
+
+Load shapefile from `BIEN` package: 
+```{r, message=FALSE, warning=FALSE}
+#species - matches the delimination from BIEN 
+sp = "Acer_rubrum"
+#Group species colmns 
+species_cols <- c("Acer rubrum", "Juglans nigra", "Rubus laciniatus", 
+                  "Ilex decidua", "Rubus spectabilis", "Acer platanoides")
+
+
+# #to save in a specified directory 
+# bien.range.out = "some/directory"
+# BIEN_ranges_species(species = species_cols, directory = bien.range.out)
+
+#to load into environment 
+ranges = BIEN_ranges_load_species(species = species_cols)
+
+#To make sure polygons have no floating 
+#Disable S2
+sf_use_s2(FALSE)
+# Apply the zero-width buffer trick
+ranges <- st_buffer(ranges, 0)
+# Make geometries valid
+ranges <- st_make_valid(ranges)
+# Drop empty or still-invalid geometries
+ranges <- ranges[!st_is_empty(ranges), ]
+ranges <- ranges[st_is_valid(ranges), ]
+# Optionally turn S2 back on for future operations
+sf_use_s2(TRUE)
+
+
+#change to terra object 
+ranges.sh = vect(ranges)
+#checking if CRS the same 
+crs(ranges.sh) == crs(conus)
+#if not use this 
+# ranges.sh <- project(ranges.sh, #raster we want to reproject
+#                                 crs(conus)) #reference raster
+# #checking if CRS the same 
+# crs(ranges.sh) == crs(conus)
+
+
+#ensure ranges are contained withint 
+ranges.sh = intersect(ranges.sh, conus)
+
+# terra uses standard subsetting
+sp.range <- ranges.sh[ranges.sh$species == sp, ]
+
+
+plot(sp.range, main = paste(unique(sp.range$species)[1], "Range"), col = "grey")
+plot(conus, add=TRUE)
+```
+
+Intersect the raster with the data:  
+```{r}
+#Historic
+clim.h.crop = crop(clim.h, sp.range)
+clim.h.sp = mask(clim.h.crop, sp.range)
+plot(clim.h.sp)
+
+#Current 
+clim.c.crop = crop(clim.c, sp.range)
+clim.c.sp = mask(clim.c.crop, sp.range)
+plot(clim.c.sp)
+```
+
+We will use these rasters in the model, so let's save them!
+```{r}
+#Historic 
+writeRaster(clim.h.sp, file = file.path(L2,#object saving directory
+                                     "ClimRastS_H_cropped.tif"), 
+            overwrite = TRUE)
+#Current 
+writeRaster(clim.c.sp, file = file.path(L2,#object saving directory
+                                     "ClimRastS_C_cropped.tif"), 
+            overwrite = TRUE)
+```
+
+
+
+
+# Phenology Data
+
+Read in the data: 
+```{r}
+#Phenology 
+load(file.path(L2, "phenology_timeperiods.RData"), verbose = TRUE)
+```
+
+## Pivotting 
+
+We want our dataset to be in wide format, were each column pertains to the species - including the lat/long information. We will also exclude any other columns. 
+
+```{r}
+#Historical
+#excluding columns 
+phe.h.long = phe.hist %>%
+  dplyr::select(latitude, longitude, species, phenophase_status)
+#pivot wider 
+phe.h.wide = phe.h.long %>%
+  pivot_wider(
+  names_from = species, #column containing values to be converted to columns 
+  values_from = phenophase_status, #cell values for the new columns
+  values_fill = NA) 
+
+
+#Current
+#excluding columns 
+phe.c.long = phe.cur %>%
+  dplyr::select(latitude, longitude, species, phenophase_status)
+#pivot wider 
+phe.c.wide = phe.c.long %>%
+  pivot_wider(
+  names_from = species, #column containing values to be converted to columns 
+  values_from = phenophase_status, #cell values for the new columns
+  values_fill = NA) 
+
+```
+
+
+## Processing Data 
+Coarsening sampling resolution - removing "repeated obs" for same locations 
+```{r}
+# Function to clean list-type species value
+clean_species_list <- function(x) { #START of function 
+  if (is.null(x) || all(is.na(x))) return(NA)
+
+  # Flatten in case x is a list, convert to character
+  x <- unlist(x)
+  x <- as.character(x)
+  
+  # Split space-separated values and check for any '1'
+  tokens <- unlist(strsplit(x, " "))
+  if ("1" %in% tokens) { #START of if
+    return(1)
+  } else { #START of else
+    return(0)
+  } #END of else
+} #END of Function
+
+#Group species colmns 
+species_cols <- c("Acer rubrum", "Juglans nigra", "Rubus laciniatus", 
+                  "Ilex decidua", "Rubus spectabilis", "Acer platanoides")
+
+#apply function to data frame
+#historical 
+phe.hw.clean <- phe.h.wide %>%
+  mutate(across(all_of(species_cols), ~map(.x, clean_species_list))) %>%
+  # Unlist the list-columns to flatten them to atomic columns
+  mutate(across(all_of(species_cols), ~unlist(.x)))
+
+#current
+phe.cw.clean <- phe.c.wide %>%
+  mutate(across(all_of(species_cols), ~map(.x, clean_species_list))) %>%
+  # Unlist the list-columns to flatten them to atomic columns
+  mutate(across(all_of(species_cols), ~unlist(.x)))
+```
+
+
+## Spatial Constraints 
+```{r, message=FALSE, warning=FALSE}
+plot(sp.range, main = paste(unique(sp.range$species)[1], "Range"), col = "grey")
+plot(conus, add=TRUE)
+```
+
+
+Here is where we will filter for an individual species. We will also apply spatial contraints to observations based on their range from the BIEN package - **for now historical and current ranges will be the same** 
+```{r}
+#Historical 
+#Filter for specific species 
+df = phe.hw.clean %>% 
+  select("longitude", "latitude", "Acer rubrum") #%>% 
+  #remove NAs that are based on other species presence 
+  # na.omit()
+#convert into spatvector 
+df = vect(df, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+#plot
+plot(conus, main = paste(names(df)[3], "Historical Observations"))
+plot(sp.range, col="grey", add=TRUE)
+plot(df, add=TRUE)
+
+#drop any points outside of range shapefile 
+df = intersect(df, sp.range)
+
+#plotting
+ggplot() + #base map
+  geom_spatvector(data = sp.range, fill="grey") +
+  #CONUS map layer
+  geom_spatvector(data = conus, fill=NA, color='grey30')+ 
+  #Points layer
+  geom_spatvector(data = df, aes(color=as.factor(`Acer rubrum`))) + 
+  #unique point value colors 
+  scale_color_manual(values = c("0" = "#994455ff", "1" = "#044789ff"),
+                     labels = c("Absent", "Present"),
+                     name = "Acer rubrum") +
+  ggtitle(paste(names(df)[3], "Historical Observations")) +
+  theme_classic() + 
+  theme(legend.position.inside = c(0.85, 0.2), 
+        legend.background = element_rect(color = "black", linewidth = 0.5))
+
+#revert back to a dataframe 
+phe.hw = as.data.frame(df)
+
+```
+
+```{r}
+#count unique values in column 
+print("Historical sample sizes")
+table(phe.hw$`Acer rubrum`)
+```
+
+```{r}
+#Current 
+#Filter for specific species 
+df = phe.cw.clean %>% 
+  select("longitude", "latitude", "Acer rubrum") #%>% 
+  #remove NAs that are based on other species presence 
+  # na.omit()
+#convert into spatvector 
+df = vect(df, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+#plot
+plot(conus, main = paste(names(df)[3], "Current Observations"))
+plot(sp.range, col="grey", add=TRUE)
+plot(df, add=TRUE)
+
+#drop any points outside of range shapefile 
+df = intersect(df, sp.range)
+
+#plotting
+ggplot() + #base map
+  geom_spatvector(data = sp.range, fill="grey") +
+  #CONUS map layer
+  geom_spatvector(data = conus, fill=NA, color='grey30')+ 
+  #Points layer
+  geom_spatvector(data = df, aes(color=as.factor(`Acer rubrum`))) + 
+  #unique point value colors 
+  scale_color_manual(values = c("0" = "#994455ff", "1" = "#044789ff"),
+                     labels = c("Absent", "Present"),
+                     name = "Acer rubrum") +
+  ggtitle(paste(names(df)[3], "Current Observations")) +
+  theme_classic() + 
+  theme(legend.position = c(0.85, 0.2), 
+        legend.background = element_rect(color = "black", linewidth = 0.5))
+
+#revert back to a dataframe 
+phe.cw = as.data.frame(df)
+
+```
+
+```{r}
+#count unique values in column 
+print("Current sample sizes")
+table(phe.cw$`Acer rubrum`)
+```
+
+
+ Save data 
+```{r}
+save(phe.hw, phe.cw, file= file.path(L2, "phenology_timeperiods_cleaned.RData"))
+```
+ 
+
+
+## Spatial/Temporal Thinning 
+- Note: Need to thin data if spatial biases apparent (virtual group work)
+```{r}
+
+```
+
+
+# Occurrence Data
+
+Read in the data: 
+```{r}
+#load R object data  
+load(file.path(L2, "range_timeperiods.RData"), verbose = TRUE)
+```
+
+
+## Pivotting 
+
+We want our dataset to be in wide format, were each column pertains to the species - including the lat/long information. We will also exclude any other columns. 
+
+First add a `detection_status` column to help with formatting for `biomod2`. So when we pivot, NAs formed can count as a form of pseudo-absence. 
+```{r}
+#Adding column with values of "1" for present
+rang.hist$detection_status = 1
+rang.cur$detection_status = 1
+```
+
+
+```{r}
+#Historical
+#excluding columns 
+rang.h.long = rang.hist %>%
+  dplyr::select(latitude, longitude, species, detection_status)
+#pivot wider 
+rang.h.wide = rang.h.long %>%
+  pivot_wider(
+  names_from = species, #column containing values to be converted to column 
+  values_from = detection_status, #cell values for the new columns
+  values_fill = NA) 
+
+
+#Current
+#excluding columns 
+rang.c.long = rang.cur %>%
+  dplyr::select(latitude, longitude, species, detection_status)
+#pivot wider 
+rang.c.wide = rang.c.long %>%
+  pivot_wider(
+  names_from = species, #column containing values to be converted to columns 
+  values_from = detection_status, #cell values for the new columns
+  values_fill = NA) 
+
+```
+
+
+
+
+## Processing Data 
+Coarsening sampling resolution - removing "repeated obs" for same locations 
+```{r}
+# Function to clean list-type species value
+clean_species_list <- function(x) { #START of function 
+  if (is.null(x) || all(is.na(x))) return(NA)
+
+  # Flatten in case x is a list, convert to character
+  x <- unlist(x)
+  x <- as.character(x)
+  
+  # Split space-separated values and check for any '1'
+  tokens <- unlist(strsplit(x, " "))
+  if ("1" %in% tokens) { #START of if
+    return(1)
+  } else { #START of else
+    return(0)
+  } #END of else
+} #END of Function
+
+#Group species colmns 
+species_cols <- c("Acer rubrum", "Juglans nigra", "Rubus laciniatus", 
+                  "Ilex decidua", "Rubus spectabilis", "Acer platanoides")
+
+#apply function to data frame
+#historical 
+rang.hw.clean <- rang.h.wide %>%
+  mutate(across(all_of(species_cols), ~map(.x, clean_species_list))) %>%
+  # Unlist the list-columns to flatten them to atomic columns
+  mutate(across(all_of(species_cols), ~unlist(.x)))
+
+#current
+rang.cw.clean <- rang.c.wide %>%
+  mutate(across(all_of(species_cols), ~map(.x, clean_species_list))) %>%
+  # Unlist the list-columns to flatten them to atomic columns
+  mutate(across(all_of(species_cols), ~unlist(.x)))
+```
+
+
+## Spatial Constraints 
+```{r, message=FALSE, warning=FALSE}
+plot(sp.range, main = paste(unique(sp.range$species)[1], "Range"), col = "grey")
+plot(conus, add=TRUE)
+```
+
+
+Here is where we will filter for an individual species. We will also apply spatial contraints to observations based on their range from the BIEN package - **for now historical and current ranges will be the same** 
+```{r}
+#Historical 
+#Filter for specific species 
+df = rang.hw.clean %>% 
+  select("longitude", "latitude", "Acer rubrum") #%>% 
+  #remove NAs that are based on other species presence 
+  # na.omit()
+#convert into spatvector 
+df = vect(df, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+#plot
+plot(conus, main = paste(names(df)[3], "Historical Observations"))
+plot(sp.range, col="grey", add=TRUE)
+plot(df, add=TRUE)
+
+#drop any points outside of range shapefile 
+df = intersect(df, sp.range)
+
+#plotting
+ggplot() + #base map
+  geom_spatvector(data = sp.range, fill="grey") +
+  #CONUS map layer
+  geom_spatvector(data = conus, fill=NA, color='grey30')+ 
+  #Points layer
+  geom_spatvector(data = df, aes(color=as.factor(`Acer rubrum`))) + 
+  #unique point value colors 
+  scale_color_manual(
+    values = c("1" = "#044789ff"),
+    labels = c("Present", "Absent"),
+    name = "Acer rubrum") +
+  ggtitle(paste(names(df)[3], "Historical Occur Observations")) +
+  theme_classic() + 
+  theme(legend.position.inside = c(0.85, 0.2), 
+        legend.background = element_rect(color = "black", linewidth = 0.5))
+
+#revert back to a dataframe 
+rang.hw = as.data.frame(df)
+
+```
+
+```{r}
+#count unique values in column 
+print("Historical sample sizes")
+table(rang.hw$`Acer rubrum`)
+```
+
+```{r}
+#Current 
+#Filter for specific species 
+df = rang.cw.clean %>% 
+  select("longitude", "latitude", "Acer rubrum") #%>% 
+  #remove NAs that are based on other species presence 
+  # na.omit()
+#convert into spatvector 
+df = vect(df, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+#plot
+plot(conus, main = paste(names(df)[3], "Current Observations"))
+plot(sp.range, col="grey", add=TRUE)
+plot(df, add=TRUE)
+
+#drop any points outside of range shapefile 
+df = intersect(df, sp.range)
+
+#plotting
+ggplot() + #base map
+  geom_spatvector(data = sp.range, fill="grey") +
+  #CONUS map layer
+  geom_spatvector(data = conus, fill=NA, color='grey30')+ 
+  #Points layer
+  geom_spatvector(data = df, aes(color=as.factor(`Acer rubrum`))) + 
+  #unique point value colors 
+  scale_color_manual(
+    values = c("1" = "#044789ff"),
+    labels = c("Present", "Absent"),
+    name = "Acer rubrum") +
+  ggtitle(paste(names(df)[3], "Current Occur Observations")) +
+  theme_classic() + 
+  theme(legend.position = c(0.89, 0.2), 
+        legend.background = element_rect(color = "black", linewidth = 0.5))
+
+#revert back to a dataframe 
+rang.cw = as.data.frame(df)
+
+```
+
+```{r}
+#count unique values in column 
+print("Current sample sizes")
+table(rang.cw$`Acer rubrum`)
+```
+
+ Save data 
+```{r}
+save(rang.hw, rang.cw, file= file.path(L2, "range_timeperiods_cleaned.RData"))
+```
+
+
+
+## Spatial/Temporal Thinning 
+- Note: Need to thin data if spatial biases apparent (virtual group work)
+```{r}
+
+```
+
+

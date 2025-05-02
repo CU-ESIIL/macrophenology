@@ -1,0 +1,84 @@
+---
+title: "Pseuodo Absences"
+author: "Lizbeth G Amador"
+date: "2025-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Create pseudo-absences for historical occurrence data (presence-only).
+
+
+#Presets 
+```{r}
+#biomod2 - ensemble modeling
+if (!requireNamespace("biomod2", quietly = TRUE)) {
+  install.packages("biomod2")
+}
+require(biomod2)
+```
+
+Directories 
+```{r}
+#ESIIL Macrophenology group - for saving 
+main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+L2 = file.path(main.dir, "Data/L2")
+```
+
+
+# Pseudo Absences 
+One way to it is through `biomod2`. See the following [site](https://biomodhub.github.io/biomod2/articles/examples_1_mainFunctions.html) 
+```{r}
+# # Transform true absences into potential pseudo-absences
+# myResp.PA <- ifelse(myResp == 1, 1, NA)
+# 
+# # Format Data with pseudo-absences : random method
+# myBiomodData.r <- BIOMOD_FormatingData(resp.var = myResp.PA,
+#                                        expl.var = myExpl,
+#                                        resp.xy = myRespXY,
+#                                        resp.name = myRespName,
+#                                        PA.nb.rep = 4,
+#                                        PA.nb.absences = 1000,
+#                                        PA.strategy = 'random')
+# 
+# myBiomodData.r
+# plot(myBiomodData.r)
+```
+
+```{r}
+# # Select multiple sets of pseudo-absences
+#
+# # Transform true absences into potential pseudo-absences
+# myResp.PA <- ifelse(myResp == 1, 1, NA)
+# 
+# # Format Data with pseudo-absences : random method
+# myBiomodData.multi <- BIOMOD_FormatingData(resp.var = myResp.PA,
+#                                            expl.var = myExpl,
+#                                            resp.xy = myRespXY,
+#                                            resp.name = myRespName,
+#                                            PA.nb.rep = 4,
+#                                            PA.nb.absences = c(1000, 500, 500, 200),
+#                                            PA.strategy = 'random')
+# myBiomodData.multi
+# summary(myBiomodData.multi)
+# plot(myBiomodData.multi)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

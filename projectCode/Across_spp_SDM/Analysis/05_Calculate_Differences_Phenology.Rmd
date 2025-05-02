@@ -43,8 +43,8 @@ L2 = file.path(main.dir, "Data/L2")
 
 
 ```{r}
-em.h = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_H.tif"))
-em.c = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_C.tif"))
+em.h = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_H_Phenology.tif"))
+em.c = rast(file.path(L2, "Acer_rubrum_FinalEnsemble_C_Phenology.tif"))
 ```
 
 

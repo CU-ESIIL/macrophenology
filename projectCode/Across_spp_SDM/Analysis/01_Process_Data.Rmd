@@ -1,13 +1,18 @@
 ---
 title: 'Step 1: Process Data'
 author: "Lizbeth G Amador"
-date: "2025-04-09"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
 pre-process data for phenology, species occurence, and climate.   
 
 # Presets 
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
 ```{r, warning=FALSE, message=FALSE}
 # Load necessary libraries
 #if statement to automatically install libraries if absent in r library
@@ -41,6 +46,24 @@ if (!requireNamespace("usdm", quietly = TRUE)) {
   install.packages("usdm")
 }
 require(usdm)
+
+#rFIA -- to download FIA data
+if (!requireNamespace("rFIA", quietly = TRUE)) {
+  install.packages("rFIA")
+}
+library(rFIA)
+
+#BIEN - to download species range maps and data 
+if (!requireNamespace("BIEN", quietly = TRUE)) {
+  install.packages("BIEN")
+}
+library(BIEN)
+
+#data.table - alternatives to read.csv and friends  
+if (!requireNamespace("data.table", quietly = TRUE)) {
+  install.packages("data.table")
+}
+library(data.table)
 
 #CoordinateCleaner -- to clean coordinates by multiple tests 
 if (!requireNamespace("CoordinateCleaner", quietly = TRUE)) {
@@ -304,7 +327,7 @@ phe.conus = as.data.frame(phe.int)
 We will now limit species to those we are interested in. 
 ```{r}
 #remove extra species 
-phe = phe.conus %>%
+phe.conus = phe.conus %>%
   filter(!species %in% c("Acer saccharum", "Hymenocallis occidentalis", 
                          "Ilex aquifolium", "Acer palmatum", "Juglans regia", 
                          "Hymenocallis littoralis")) %>% 
@@ -332,7 +355,259 @@ save(phe.hist, phe.cur, file = file.path(L2, "phenology_timeperiods.RData"))
 
 
 
+# Species Occurrence 
+
+## Reference dataset
+Here we will adjust `phe.conus` to reflect the species occurrence aspect of the study. Since we are focused on the individual of the species.  
+
+```{r}
+rang = phe.conus %>% 
+  select(-c(phenophase_status, day_of_year))
+
+names(rang)
+```
+
+## FIA data 
+FIA Citation:
+Stanke, Hunter; Finley, Andrew O.; Weed, Aaron S.; Walters, Brian F.; Domke, Grant M. 2020. rFIA: An R package for estimation of forest attributes with the US Forest Inventory and Analysis database. Environmental Modelling & Software. 127(9): 104664. https://doi.org/10.1016/j.envsoft.2020.104664. 
+
+
+Setting options, directories, and downloading FIA data 
+```{r, messages = FALSE}
+#Adjust global timeout 
+options(timeout=3600)
+
+#Automatically make FIA folder for current directory 
+#Define a FIA directory path
+fia_dir <- file.path(getwd(), "FIA")
+# Check if the folder exists — if not, create it
+if (!dir.exists(fia_dir)) {
+  dir.create(fia_dir)
+  message("Created FIA directory at: ", fia_dir)
+} else {
+  message("Using existing FIA directory at: ", fia_dir)
+}
+
+#list of state codes 
+allstates = c("AK", "AL", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", 'NJ', "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+
+#Get species FIA Data - will take a while to load!
+getFIA(
+  states = allstates,
+  dir = file.path(fia_dir), #FIA folder directory where .csv will be saved  
+  # tables = "PLOT",
+  load = FALSE #do you want to store in R? otherwise downloads data 
+)
+```
+
+The for loop below is set up to just calculate data from all states and save a single csv for each state. -- *Code adapted from Adam Eichenwald* 
+```{r}
+#for loop to parse through FIA data for all states and exports indv
+for (state in allstates){ #START of loop
+  
+  #Optional: Message to keep track of states being processed 
+  message(paste("Processing", state, "...")) 
+  
+  #1. Load FIA data for the state - see code chunk above for how to download data
+  FIAdb <- readFIA(
+    dir = fia_dir, #FIA folder directory to where all the .csv files stored
+    inMemory = FALSE, 
+    ncores = 8, 
+    states = state)
+  
+  #2. Estimate trees per acre 
+  TPA <- tpa(
+    db = FIAdb,
+    byPlot = TRUE,
+    nCores = 8,
+    bySpecies = TRUE) %>%
+    mutate(PLT_CN = as.character(PLT_CN))
+  
+  #3. Read the corresponding plot file 
+  plot_path <- list.files(
+  fia_dir, #FIA folder directory 
+  pattern = paste0(state, "_PLOT.csv"), 
+  full.names = TRUE) 
+  
+  #Optional: in case there's no data 
+ if (length(plot_path) == 0) { #START of if
+  message(paste("No plot file found for", state, "- skipping"))
+  next
+ } #END of if 
+  
+  #Reading [state]_PLOT.csv
+  plot_file <- fread(plot_path[1])
+  
+  #4. Join plot with TPA data to PLOT file 
+  state_plot <- plot_file %>%
+    select(CN, LON, LAT) %>%
+    distinct() %>%
+    mutate(PLT_CN = as.character(CN)) %>%
+    data.frame() %>%
+    inner_join(TPA, by = "PLT_CN") %>%
+    rename(Trees_per_acre = TPA) %>% 
+    mutate(state = state) #optional: adds a "state" column
+  
+  #6. Export result for this state
+  output_path <- file.path(fia_dir, paste0(state, "_FIASpecies", ".csv"))
+  fwrite(state_plot, output_path)
+   
+} #End of loop
+```
+
+```{r}
+#Combine all processed states 
+# Get all output CSVs that start with "_FIASpecies_"
+FIAall <- list.files(
+  path = fia_dir, #FIA folder directory with saved .csv
+  pattern = "_FIASpecies\\.csv$",  # Regex: match files ending with "_FIASpecies.csv"
+  full.names = TRUE
+) %>%
+  lapply(fread) %>%
+  rbindlist()
+
+#Optional: Save combined output
+fwrite(FIAall, file.path(fia_dir, "_FIASpecies_ALL.csv"))
+
+#Preview combined result
+print(head(FIAall))
+names(FIAall)
+```
+
+
+We will need the columns that match with `phe.range`columns ("latitude", "longitude"     "year_rect", "native_status" "species", "data_name"). This will facilitate data merging.  
+```{r}
+fia.sp = FIAall %>%
+  select("LON", "LAT", "YEAR", "SCIENTIFIC_NAME") %>%
+  rename(longitude = LON, latitude = LAT, year_rect = YEAR, species = SCIENTIFIC_NAME) %>%
+  filter(species %in% c("Acer rubrum", "Acer platanoides", "Juglans nigra",
+                        "Ilex decidua", "Rubus spectabilis", "Rubus laciniatus")) %>%
+  mutate(data_name = "FIA", native_status = NA)
+```
+
+```{r}
+unique(fia.sp$species)
+sort(unique(fia.sp$year_rect))
+```
+
+```{r}
+#Plot observations - uncomment 
+# rang.sh = vect(fia.sp, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+# plot(conus, main = "All Phenological Observations"); plot(rang.sh, add=TRUE)
+```
+
+
+```{r}
+#save 
+write.csv(fia.sp, file = file.path(L1, "FIA_focal_species_occurrence.csv"))
+```
+
+
+## BIEN data 
+```{r}
+#vector of focal species 
+species = c("Acer rubrum", "Acer platanoides", "Juglans nigra", "Ilex decidua", 
+            "Rubus spectabilis", "Rubus laciniatus")
+
+traitslist = BIEN_trait_list() #Lists all available types of trait
+```
+
+```{r, messages = FALSE}
+#Returns all occurrence records for a specified species
+bien = BIEN_occurrence_species(species = species, 
+                                  native.status = TRUE, 
+                                  observation.type = TRUE) 
+```
+
+Here we want to make sure the data points fall within the CONUS extent.
+```{r}
+#Making sure observations fall within CONUS extent 
+#turn into a point vector 
+bien.sh = vect(bien, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
+
+plot(conus, main = "All Occurence Observations"); plot(bien.sh, add=TRUE)
+
+#drop any points outside of conus shapefile 
+bien.int = intersect(bien.sh, conus)
+plot(conus, main="All Occurrence Obs: Post intersect"); plot(bien.int, add=TRUE)
+
+#revert back to a dataframe 
+bien.conus = as.data.frame(bien.int)
+
+#save 
+write.csv(bien.conus, file = file.path(L1, "BIEN_focal_species_occurrence_conus.csv"))
+```
+
+Lets see where these data are from: 
+```{r}
+#see unique instances of data sources and such - unccoment to see
+bien.datsource = bien.conus %>%
+  select(datasource, dataset, dataowner, datasource_id) %>%
+  distinct()
+```
+
+This BIEN data includes observations from GBIF (and iNaturalist), and other consortiums!
+
+We will need the columns that match with `phe.range`columns ("latitude", "longitude"     "year_rect", "native_status" "species", "data_name"). This will facilitate data merging. 
+```{r}
+#Pull year from date 
+bien.conus$year_rect = format(as.Date(bien.conus$date_collected, format="%Y-%m-%d"),"%Y")
+
+#Select columns & rename 
+bien.sp = bien.conus %>%
+  rename(species = scrubbed_species_binomial, data_name = datasource) %>%
+  mutate(native_status = "native") %>% 
+  select(latitude, longitude, year_rect, native_status, species, data_name)
+  
+```
+
+
+## Merge all occurrence data 
+
+```{r}
+#Uncomment 
+#Check that all cloumns are the same class  
+str(rang)
+str(fia.sp)
+str(bien.sp)
+
+#What's up with bien.shp year_rect
+# unique(bien.sp$year_rect)
+#How many NAs
+# sum(is.na(bien.sp$year_rect))
+```
+
+```{r}
+#Remove rows with NAs in year_rect column 
+bien.sp = bien.sp[!is.na(bien.sp$year_rect),]
+sum(is.na(bien.sp$year_rect))
+```
+
+
+```{r}
+rang.all = rbind(rang, fia.sp, bien.sp)
+```
+
+Filter for time periods of interest
+```{r}
+#Historical
+rang.hist = rang.all %>%
+  filter(year_rect >= 1910, year_rect <= 1950)
+#Current 
+rang.cur = rang.all %>%
+  filter(year_rect >= 1985)
+```
+
+```{r}
+plot(rang.hist$longitude, rang.hist$latitude, main="Historical Occurrence Observations")
+plot(rang.cur$longitude, rang.cur$latitude, main="Comtemporary Occurrence Observations")
+```
 
 
 
-
+```{r}
+#save objects 
+save(rang.hist, rang.cur, file = file.path(L2, "range_timeperiods.RData"))
+#to import 
+# load(file.path(L2, "range_timeperiods.RData"), verbose = TRUE)
+```

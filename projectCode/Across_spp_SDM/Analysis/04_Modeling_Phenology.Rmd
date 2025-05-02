@@ -1,7 +1,7 @@
 ---
 title: "Modeling"
 author: "Lizbeth G Amador"
-date: "2025-04-25"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
@@ -63,8 +63,8 @@ Directories
 #ESIIL Macrophenology group - for saving 
 main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
 L2 = file.path(main.dir, "Data/L2")
-#ensemble folder 
-L2.em = file.path(L2, "ensemble")
+#ensemble folder for phenology 
+L2.em = file.path(L2, "ensemble/Phenology")
 ```
 
 Data
@@ -73,14 +73,14 @@ Data
 load(file.path(L2, "phenology_timeperiods_cleaned.RData"), verbose = TRUE)
 #read climate rasters 
 clim.h = rast(file.path(L2, #object saving directory
-                                     "ClimRastS_H_cleaned.tif"))
+                                     "ClimRastS_H_cropped.tif"))
 clim.c = rast(file.path(L2, #object saving directory
-                                     "ClimRastS_C_cleaned.tif"))
+                                     "ClimRastS_C_cropped.tif"))
 ```
 
-#Historical 
+# Historic 
 
-## i. `biomod2` formatting 
+## i. **`biomod2` formatting** 
 
 We will be modeling the phenology for each species individually. We will filter for each species and then format the data for `biomod2`. 
 
@@ -159,28 +159,30 @@ Some other ways below
 
 ## iii.Modeling
 
-see [site](https://biomodhub.github.io/biomod2/reference/ModelsTable.html)
-Model options: 
-|   |model  |type     |model descriptions                           |package|
-|:--|:-----:|:-------:|:--------------------------------------------|:------|
-|1  |ANN    |binary   |Fit Neural Networks                          |nnet|
-|2  |CTA    |binary   |Recursive Partitioning and Regression Trees  |rpart|
-|3  |FDA    |binary   |Flexible Discriminant Analysis               |mda|
-|4  |GAM    |binary   |General Additive Model                       |gam|
-|5  |GAM    |binary   |General Additive Model                       |mgcv|
-|6  |GAM    |binary   |General Additive Model                       |mgcv|
-|7  |GBM    |binary   |Generalized Boosted Regression Modeling (GBM)|gbm |  
-|8  |GLM    |binary   |General Linear Model                         |stats|
-|9  |MARS   |binary   |Multivariate Adaptive Regression Splines     |earth|
-|10 |MAXENT |binary   |Maximum Entropy                              |MAXENT|
-|11 |MAXNET |binary   |Maximum Entropy                              |manet|
-|12 |RF     |binary   |Random Forest                                |randomForest|
-|13 |SRE    |binary   |Surface Range Envelope                       |biomod2|
-|14 |XGBOOST|binary   |eXtreme Gradient Boosting Training           |xboost|
+see [site](https://biomodhub.github.io/biomod2/reference/ModelsTable.html)  
+Model options:  
+
+|   |model  |type     |model descriptions                           |package| 
+|:--|:-----:|:-------:|:--------------------------------------------|:------| 
+|1  |ANN|binary|Fit Neural Networks                          |nnet| 
+|2  |CTA|binary|Recursive Partitioning and Regression Trees  |rpart| 
+|3  |FDA|binary|Flexible Discriminant Analysis               |mda| 
+|4  |GAM|binary|General Additive Model                       |gam| 
+|5  |GAM|binary|General Additive Model                       |mgcv| 
+|6  |GAM|binary|General Additive Model                       |mgcv| 
+|7  |GBM|binary|Generalized Boosted Regression Modeling (GBM)|gbm |   
+|8  |GLM|binary|General Linear Model                         |stats| 
+|9  |MARS|binary|Multivariate Adaptive Regression Splines     |earth| 
+|10 |MAXENT|binary|Maximum Entropy                              |MAXENT| 
+|11 |MAXNET|binary|Maximum Entropy                              |manet| 
+|12 |RF|binary|Random Forest                                |randomForest| 
+|13 |SRE|binary|Surface Range Envelope                       |biomod2| 
+|14 |XGBOOST|binary|eXtreme Gradient Boosting Training           |xboost| 
+
 
 
 ### Single models 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -207,12 +209,12 @@ myBiomodModelOut.h
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
-# Get evaluation scores & variables importance
-get_evaluations(myBiomodModelOut.h)
-get_variables_importance(myBiomodModelOut.h)
+# Get evaluation scores & variables importance - uncomment to see 
+# get_evaluations(myBiomodModelOut.h)
+# get_variables_importance(myBiomodModelOut.h)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -236,7 +238,7 @@ Seems like Random Forest (RF) was the best, followed by Generalised Boosted Mode
 Overall, ppt.avg was the most important variable across all models 
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -248,7 +250,7 @@ bm_PlotResponseCurves(bm.out = myBiomodModelOut.h,
                       models.chosen = get_built_models(myBiomodModelOut.h)[c(1:3, 12:14)], fixed.var = 'min')
 ```
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -261,7 +263,7 @@ bm_PlotResponseCurves(bm.out = myBiomodModelOut.h,
 
 
 Make a vector of the best scoring models
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -286,7 +288,7 @@ ggplot(bestmodelscal)+
   geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
 ```
 
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -319,7 +321,7 @@ Aw dang, well we are intreasted in predicting what has already happened and not 
 
 
 Let's save the best models from the calibration! 
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -342,7 +344,7 @@ bestmodsfullnames.h
  
 
 ### Ensemble model: Testing
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -372,7 +374,7 @@ myBiomodEM.h
 #                                      paste0("biomodensemble_Acer_rubrum_hist_out_", today, ".rds")))
 ```
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -388,7 +390,7 @@ print(kept_models)
 ```
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -400,7 +402,7 @@ bm_PlotVarImpBoxplot(bm.out = myBiomodEM.h, group.by = c('expl.var', 'algo', 'me
 bm_PlotVarImpBoxplot(bm.out = myBiomodEM.h, group.by = c('algo', 'expl.var', 'merged.by.run'))
 ```
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -413,7 +415,7 @@ bm_PlotResponseCurves(bm.out = myBiomodEM.h,
 
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -436,7 +438,7 @@ bm_PlotResponseCurves(bm.out = myBiomodEM.h,
 ### Ensemble model: Final  
  
 Projecting across space using initial ensemble outputs and pre-moeling data. 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -450,7 +452,7 @@ plot(sp_projection.h)
 #spits lots of rasters 
 ```
 
-```{r}
+```{r, message=FALSE}
 #Saving plots - uncomment to save
 # png(file = file.path(L2, paste0("EMFProj_all_Historical_", today, ".png")), width=8, height=7, units="in", res=600)
 # try(plot(sp_projection.h))
@@ -459,7 +461,7 @@ plot(sp_projection.h)
 
 
 Choose the ensemble model (one) that looks the 'best' to you and re-run on its own - Here we chose the EMca by TSS 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -485,13 +487,13 @@ r = rast(EMcaTSS.h@proj.out@link)
 writeRaster(r, 
             file = file.path(L2, paste0(
   gsub("\\.", "_", EMcaTSS.h@sp.name), 
-  "_FinalEnsemble_H.tif")))
+  "_FinalEnsemble_H_Phenology.tif")), overwrite = TRUE)
 ```
 
 
 
 # Current 
-## i. `biomod2` formatting 
+## i. **`biomod2` formatting** 
 
 
 ```{r}
@@ -556,7 +558,7 @@ plot(bmdat.c, calib.lines = cv.k.c)
 
 ## iii. Modeling 
 ### Single models 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -583,12 +585,12 @@ myBiomodModelOut.c
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
-# Get evaluation scores & variables importance
-get_evaluations(myBiomodModelOut.c)
-get_variables_importance(myBiomodModelOut.c)
+# Get evaluation scores & variables importance -- uncomment to see 
+# get_evaluations(myBiomodModelOut.c)
+# get_variables_importance(myBiomodModelOut.c)
 ```
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -612,7 +614,7 @@ Seems like Random Forest (RF) was the best, followed by Generalised Boosted Mode
 Overall, ppt.avg was the most important variable across all models, followed by temp.avg 
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -631,7 +633,7 @@ bm_PlotResponseCurves(bm.out = myBiomodModelOut.c,
 
 
 Make a vector of the best models
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -656,7 +658,7 @@ ggplot(bestmodelscal)+
   geom_col(mapping = aes(x = modeleval.val...algo..., y = modeleval.val...calibration...))
 ```
 
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -686,7 +688,7 @@ ggplot(bestmodelsval)+
 ```
 
 
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -709,7 +711,7 @@ bestmodsfullnames.c
 
 
 ### Ensemble modeling: Testing 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -741,7 +743,7 @@ myBiomodEM.c
 #                                      paste0("biomodensemble_Acer_rubrum_cur_out_", today, ".rds")))
 ```
 
-```{r}
+```{r, message=FALSE}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -757,7 +759,7 @@ print(kept_models)
 ```
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -772,7 +774,7 @@ bm_PlotVarImpBoxplot(bm.out = myBiomodEM.c, group.by = c('algo', 'expl.var', 'me
 
 
 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -784,7 +786,7 @@ bm_PlotResponseCurves(bm.out = myBiomodEM.c,
 ```
 
   
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -808,7 +810,7 @@ bm_PlotResponseCurves(bm.out = myBiomodEM.c,
 ### Ensemble Model: Final 
 
 Projecting across space using initial ensemble outputs and pre-moeling data. 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -831,7 +833,7 @@ plot(sp_projection.c)
 
 
 Choose the ensemble model (one) that looks the 'best' to you and re-run on its own - Here we chose the EMca by TSS 
-```{r}
+```{r, message=FALSE, results='hide'}
 #set working directory - biomod2 automatically creates a folder 
 setwd(L2.em)
 
@@ -862,7 +864,7 @@ r = rast(EMcaTSS.c@proj.out@link)
 writeRaster(r, 
             file = file.path(L2, paste0(
   gsub("\\.", "_", EMcaTSS.c@sp.name), 
-  "_FinalEnsemble_C.tif")))
+  "_FinalEnsemble_C_Phenology.tif")), overwrite = TRUE)
 ```
 
 

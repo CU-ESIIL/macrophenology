@@ -313,15 +313,19 @@ Here we want to make sure the data points fall within the CONUS extent.
 phe.sh = vect(phe, geom = c("longitude", "latitude"), keep = TRUE, crs = crs(conus))
 plot(conus, main = "All Phenological Observations"); plot(phe.sh, add=TRUE)
 
+#Renaming DomainID column - conus already has DomainID column
 phe.sh = phe.sh %>% 
-  select(-DomainID)
+  rename(domain_id = DomainID)
 
 #drop any points outside of conus shapefile 
 phe.int = intersect(phe.sh, conus)
 plot(conus, main="All Phenological Obs: Post intersect"); plot(phe.int, add=TRUE)
 
 #revert back to a dataframe 
-phe.conus = as.data.frame(phe.int)
+phe.conus = phe.int %>%
+  select(-c(domain_id, OBJECTID, Shape_Leng, DomainName, Shape_Le_1, Shape_Area)) %>%
+  rename(domain_id = DomainID) %>% #Renaming 
+  as.data.frame()
 ```
 
 We will now limit species to those we are interested in. 
@@ -332,7 +336,7 @@ phe.conus = phe.conus %>%
                          "Ilex aquifolium", "Acer palmatum", "Juglans regia", 
                          "Hymenocallis littoralis")) %>% 
   dplyr::select(latitude, longitude, day_of_year, year_rect, native_status, 
-                species, phenophase_status, data_name) 
+                species, phenophase_status, data_name, domain_id, observation_date) 
 
 ```
 

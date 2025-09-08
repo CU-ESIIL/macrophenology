@@ -1,0 +1,368 @@
+---
+title: "exploring species list"
+author: "Lizbeth G Amador"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+#Libraries 
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+
+#ESIIL Macrophenology group - for saving 
+# main.dir = "G:/Shared drives/ESIIL_Macrophenology/Across_sp_SDM"
+# L2 = file.path(main.dir, "Data/L2")
+
+#Source file directories
+source(file.path(getwd(), "File_Directories.R"))
+```
+
+
+```{r}
+#load biomod objects 
+load(file.path(L2, "phenology_timeperiods_thinned_cleaned.RData"), verbose = TRUE)
+```
+
+pivot longer
+```{r}
+phe.h.long = pivot_longer(phe.h.clean,
+  cols = -c(latitude, longitude), # keep lat and long fixed
+  names_to = "species",         # column for species names
+  values_to = "phenophase_status",       # column for their values
+  values_drop_na = TRUE #drop NA values 
+)
+#adding time period -- orig data don't have year info 
+phe.h.long$tp = "hist"
+
+phe.c.long = pivot_longer(phe.c.clean,
+  cols = -c(latitude, longitude), # keep lat and long fixed
+  names_to = "species",         # column for species names
+  values_to = "phenophase_status",       # column for their values
+  values_drop_na = TRUE #drop NA values 
+)
+
+#adding time period -- orig data don't have year info 
+phe.c.long$tp = "curr"
+```
+
+
+
+Check if species still have >= 50 observations 
+```{r}
+#Historic
+#look at sample size for each species (active status for a conservative approach)
+drop.sp = phe.h.long %>% 
+  filter(phenophase_status == 1) %>%
+  count(species) 
+
+#filter for observations greater than/equal to 50 
+drop.sp.drop = drop.sp %>%
+  filter(n>= 50)
+
+#remove species from df with phenology info 
+p.h.drop = phe.h.long %>%
+  filter(species %in% drop.sp.drop$species)
+
+## species sample size (historic time period) 
+length(unique(p.h.drop$species))
+ct.h = p.h.drop %>%
+  count(species)
+
+
+
+#Current 
+#look at sample size for each species (active status for a conservative approach)
+drop.sp = phe.c.long %>% 
+  filter(phenophase_status == 1) %>%
+  count(species) 
+#filter for observations greater than/equal to 50 
+drop.sp.drop = drop.sp %>%
+  filter(n>= 50)
+
+#remove species from df with phenology info 
+p.c.drop = phe.c.long %>%
+  filter(species %in% drop.sp.drop$species)
+
+## species sample size (historic time period) 
+length(unique(p.c.drop$species))
+ct.c = p.c.drop %>%
+  count(species)
+
+```
+
+```{r}
+# Observations with presence threshold only 
+#find overlapping species 
+comm.sp = intersect(ct.h$species, ct.c$species)
+#merge the species count info
+#historic
+ct.h.red = ct.h %>% 
+  filter(species %in% comm.sp)
+#current 
+ct.c.red = ct.c %>% 
+  filter(species %in% comm.sp)
+#combine the species counts for both time periods 
+comm.sp.ct = cbind(ct.h.red, ct.c.red)
+#rename columns 
+names(comm.sp.ct) <- c("species", "hist.n", "dud", "curr.n")
+comm.sp.ct = select(comm.sp.ct, -dud)
+
+#save list 
+write.csv(comm.sp.ct, file = file.path(L2, "Focal_Species_List.csv"), row.names = FALSE)
+```
+
+
+Filter the main datasets
+```{r}
+##Historic
+#wide dataset
+#pull species list 
+sp = comm.sp.ct$species
+#remove columns that are in the species list -- want to test those with  insufficient true absence observations
+phe.h = phe.h.clean[, intersect(names(phe.h.clean), sp)]
+#Add lat/on back into it 
+phe.h = cbind(phe.h.clean[, 1:2], phe.h)
+
+#long dataset
+phe.h.long = phe.h.long %>%
+  filter(species %in% comm.sp.ct$species)
+
+
+##Current 
+#wide dataset 
+#pull species list 
+sp = comm.sp.ct$species
+#remove columns that are in the species list -- want to test those with  insufficient true absence observations
+phe.c = phe.c.clean[, intersect(names(phe.c.clean), sp)]
+#Add lat/on back into it 
+phe.c = cbind(phe.c.clean[, 1:2], phe.c)
+
+#long dataset 
+phe.c.long = phe.c.long %>%
+  filter(species %in% comm.sp.ct$species)
+```
+
+
+```{r}
+#save the wide dataset
+save(phe.h, phe.c, file = file.path(L2, "phenology_timeperiods_thinned_cleaned_focalspecies.RData"))
+```
+
+
+
+# Present-Absent filtering 
+Filter for species with absences >= 10 unique observations. This already includes species with presences >= 50
+```{r}
+#Historic
+#look at sample size for each species (active status for a conservative approach)
+drop.sp = phe.h.long %>% 
+  filter(phenophase_status == 0) %>%
+  count(species) 
+#filter for observations greater than/equal to 50 
+ct.h = drop.sp %>%
+  filter(n>= 10)
+
+
+#Current 
+#look at sample size for each species (active status for a conservative approach)
+drop.sp = phe.c.long %>% 
+  filter(phenophase_status == 0) %>%
+  count(species) 
+#filter for observations greater than/equal to 50 
+ct.c = drop.sp %>%
+  filter(n>= 10)
+
+
+# Observations filter by P & A threshold 
+#overlaping species between time periods 
+comm.sp = intersect(ct.h$species, ct.c$species)
+
+#merge the species count info
+#historic
+ct.h.rd = ct.h %>% 
+  filter(species %in% comm.sp)
+#current 
+ct.c.rd = ct.c %>% 
+  filter(species %in% comm.sp)
+
+#combine the species counts for both time periods 
+comm.sp.ct = cbind(ct.h.rd, ct.c.rd)
+#rename columns 
+names(comm.sp.ct) <- c("species", "hist.n", "dud", "curr.n")
+comm.sp.ct0 = select(comm.sp.ct, -dud)
+
+#save list 
+write.csv(comm.sp.ct0, file = file.path(L2, "Focal_Species_List_AbsenceThreshold_TimeComparisions.csv"), row.names = FALSE)
+```
+
+^save all that into its own r script 
+
+# Explore data and Merge native status 
+```{r}
+#phenology list filter by presence threshold only  -- backing up 
+p = rbind(phe.h.long, phe.c.long)
+
+sort(unique(p$species))
+```
+
+
+
+```{r}
+#phenology list filter by presence & absencethreshold 
+p.0 = filter(p, species %in% comm.sp.ct0$species)
+sort(unique(p.0$species))
+
+```
+
+```{r}
+# Historic 
+p.0 %>%
+   filter(tp == "hist") %>% 
+  count(species, phenophase_status)
+
+# Current  
+p.0 %>%
+   filter(tp == "curr") %>% 
+  count(species, phenophase_status)
+```
+
+
+## Pull native status info pulled from the gbif site 
+```{r}
+trp.sp = read.csv("G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L1/GBIF_nativestatus.csv", header = TRUE)
+
+#look at BONAP species first 
+trp.sp.gbif = rename(trp.sp, species = Accepted_species_gbif)
+#Convert 1/0 native status to N/NN 
+trp.sp.gbif$status = ifelse(trp.sp$native == 1, "N", "NN")
+trp.sp.gbif = trp.sp.gbif %>% select(species, degreeOfEstablishment, status)
+
+# Replace "NN" in 'status' if 'degreeOfEstablishment' contains "invasive"
+trp.sp.gbif$status[trp.sp.gbif$status == "NN" #find rows where status is nonnative (NN)
+                   & grepl("invasive", trp.sp.gbif$degreeOfEstablishment, ignore.case = TRUE)] <- "I"
+#remove estbalishment column - don't need anymore 
+trp.sp.gbif = select(trp.sp.gbif, -degreeOfEstablishment)
+
+
+#Manually adding the species not found in gbif species list -- used a mix between plantsUSDA (https://plants.usda.gov/) and Royal Botanical Gardens KEW (https://powo.science.kew.org/) (Accessed: 24 June, 2025)
+man.sp = c("Arisaema dracontium", "Asimina triloba", "Ceanothus greggii", "Chamerion angustifolium", "Clintonia borealis", "Dicentra canadensis", "Dichelostemma capitatum", "Gaultheria shallon", "Halesia carolina", "Lilium superbum", "Melilotus officinalis", "Mimulus guttatus", "Nuphar lutea", "Oxalis montana", "Psoralidium tenuiflorum", "Trientalis borealis", "Trillium cuneatum", "Trillium undulatum")
+man.status = c(rep("N", 10), "I", rep("N", 7))
+
+man.status = as.data.frame(cbind(man.sp, man.status))
+names(man.status) <- c("species", "status")
+
+#Add the species to trp
+trp.sp = rbind(trp.sp.gbif, man.status)
+```
+
+add NPN growth habait info 
+```{r}
+require(rnpn)
+#get species info from npn
+npn.sp = npn_species(kingdom = 'Plantae')
+#select columns of interest 
+npn.sp.rd = npn.sp %>% 
+  mutate(species = paste(genus, species, sep= " ")) %>%
+  select(species, common_name, genus_common_name, functional_type)
+
+#join with trp 
+trp.sp = left_join(trp.sp, npn.sp.rd, by = "species")
+```
+
+```{r}
+# write.csv(trp.sp, "G:/Shared drives/MSB_Phenology/Amador/Amador, Liz-Phenology Dissertation 2023/Chapters/Chapter4/Data/L2/Focal_Species_List_Information.csv", row.names = FALSE)
+```
+
+```{r}
+#phenology list filter by presence threshold only 
+p.jn = left_join(p, trp.sp, by = "species") 
+#phenology list filter by presence & absencethreshold 
+p.0.jn = left_join(p.0, trp.sp, by = "species") 
+```
+
+```{r}
+p.0.jn %>%
+  group_by(species, status) %>%
+  summarise(n())
+```
+
+1 invasives 
+
+```{r}
+p.jn %>%
+  group_by(species, status) %>%
+  summarise(n())
+```
+
+12 invasives 
+134 natives 
+
+```{r}
+#phenology list filter by presence threshold only 
+p.jn %>%
+  count(status)
+#phenology list filter by presence & absencethreshold 
+p.0.jn %>%
+  count(status)
+```
+
+
+
+```{r}
+p.jn %>% 
+  count(functional_type)
+
+p.0.jn %>% 
+  count(functional_type)
+```
+
+
+```{r}
+p.jn %>% 
+  count(species, functional_type)
+
+p.0.jn %>% 
+  count(species, functional_type)
+```
+
+
+
+```{r}
+sp.ft = p.jn %>% 
+  count(species, functional_type)
+
+sp.ft %>% 
+  count(functional_type)
+```
+
+
+
+```{r}
+p.jn %>% 
+  count(genus_common_name)
+
+p.0.jn %>% 
+  count(genus_common_name)
+```
+
+
+
+```{r}
+p.jn %>% 
+  count(species, functional_type, status)
+
+p.0.jn %>% 
+  count(species, functional_type, status)
+```
+
+

@@ -1,0 +1,183 @@
+
+#Pullig the CV and CI rasters from the ensemble model 
+
+
+
+#########
+#Presets 
+#########
+# Load necessary libraries
+#if statement to automatically install libraries if absent in r library
+#tidyverse - mainly for data wrangling & plotting/mapping
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+library(tidyverse)
+
+#terra - spatial package 
+if (!requireNamespace("terra", quietly = TRUE)) {
+  install.packages("terra")
+}
+require(terra)
+#biomod2 - ensemble modeling
+if (!requireNamespace("biomod2", quietly = TRUE)) {
+  install.packages("biomod2")
+}
+require(biomod2)
+
+
+###########
+# Data
+###########
+#Directories
+##Data origin 
+getwd() #curious what it looks like 
+#ensemble folder for phenology - output folder
+#dir.create("Phenology") #create directory 
+L2.em = file.path(getwd(), "Phenology")
+
+#Ensure the directory exists!
+if (!dir.exists(L2.em)) {
+  dir.create(L2.em, recursive = TRUE)
+  message("Created directory at: ", L2.em)
+} else {
+  message("Using existing directory at: ", L2.em)
+}
+
+
+#Data
+#load objects 
+load("phenology_timeperiods_thinned_cleaned_focalspecies.RData", verbose = TRUE)
+load("range_timeperiods_thinned_cleaned_focalspecies.RData", verbose = TRUE)
+
+#read climate rasters 
+# 1. Save rasters into a list  
+#^: starts with, .*:  matches any characters, including spaces, after the underscore, \\.tif$: must end with .tif  
+tif_files_h = list.files(file.path(getwd()), 
+                         pattern = "^ClimRastS_H_cropped_.*\\.tif$", full.names = TRUE)
+tif_files_c = list.files(file.path(getwd()), 
+                         pattern = "^ClimRastS_C_cropped_.*\\.tif$", full.names = TRUE)
+# 2. Read each raster as a SpatRaster and store in a list
+rasters_h <- lapply(tif_files_h, rast)
+rasters_c <- lapply(tif_files_c, rast)
+# 3. Extract species names from file names (e.g., from "ClimRastS_H_cropped_Acer glabrum.tif")
+species_names <- tools::file_path_sans_ext(basename(tif_files_h))
+species_names <- gsub("ClimRastS_H_cropped_", "", species_names)  # adjust to your naming
+species_names <- gsub("_", " ", species_names)
+# 4. Load rasters into a named list 
+sp.clim.rasters.h <- setNames(lapply(tif_files_h, rast), species_names)
+sp.clim.rasters.c <- setNames(lapply(tif_files_c, rast), species_names)
+
+
+
+#rds file(s)
+myBioModelOut = readRDS() 
+
+
+#df: phe.h, phe.c, rang.h, rang.c
+#time: H, C
+#type: Phenology, Range
+
+
+em.fun = function(df, time, type){
+  ###########################
+  ## i. `biomod2` formatting 
+  ###########################
+  #Select species name
+  myRespName = i
+  # Get corresponding P data
+  myResp = df[, myRespName]
+  # Making sure there are no 0s
+  myResp = ifelse(myResp == 1, 1, NA)
+  #Get corresponding coordinates
+  myRespXY = as.data.frame(df[, c('longitude', 'latitude')]) #Make sure long goes first!
+  
+  ###########################
+  ## iii. Pull best models 
+  ###########################
+  ##CALIBRATION: choose high scoring models
+  modeleval <- myBiomodModelOut@models.evaluation
+  #Create a new data frame with stuff 
+  modelevaldataset <- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]], 
+                                modeleval@val[["metric.eval"]], modeleval@val[["validation"]], 
+                                modeleval@val[["calibration"]])
+  #Filter based on a TSS threshold 
+  bestmodelscal <- modelevaldataset %>% 
+    filter(modeleval.val...metric.eval...== "TSS") %>%  
+    filter(modeleval.val...calibration... >= 0.6) # select models that had TSS over 0.6, done by Carroll et al. 
+  ##VALIDATION: choose high scoring models
+  #Filter based on a TSS threshold 
+  bestmodelsval <- modelevaldataset %>% 
+    filter(modeleval.val...metric.eval...== "TSS") %>%
+    filter(modeleval.val...validation... > 0.6) 
+  ##best models
+  bestmods <- c(unique(bestmodelscal$modeleval.val...algo...), unique(bestmodelsval$modeleval.val...algo...))
+  #calibration 
+  filt.cal<- bestmodelscal %>% 
+    filter(modeleval.val...algo...%in% bestmods)
+  #validation
+  filt.val <- bestmodelsval %>% 
+    filter(modeleval.val...algo...%in% bestmods)
+  #full names of best models 
+  bestmodsfullnames = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
+  
+  
+  ###########################
+  ## iv. Ensemble model
+  ###########################
+  #Model ensemble models
+  myBiomodEM <- biomod2::BIOMOD_EnsembleModeling(bm.mod = myBiomodModelOut, #singles model output
+                                                   models.chosen = bestmodsfullnames, #vector of best models
+                                                   em.by = 'all', #what models will be combined to ensemble
+                                                   em.algo = c('EMcv', 'EMmean'), #types of ensembles models to be computed 
+                                                   metric.select = c('TSS'),
+                                                   metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
+                                                   var.import = 3, #num permutationsto est var importance
+                                                   EMci.alpha = 0.05, #significance level 
+                                                   EMwmean.decay = 'proportional') #relative importance of weights 
+  
+  #get today's date -  uncomment to save 
+  today = format(Sys.Date(), format = "%Y%m%d")
+  ##save biomodout file
+  saveRDS(myBiomodEM, file = file.path(L2.em, paste0(gsub("\\.", "_", myBiomodEM@sp.name),
+                                                "_myBiomodEM_", time, "_", type, ".rds")))
+  
+  ###########################
+  ## v. Ensemble Projections  
+  ###########################
+  # Projecting across space using initial ensemble outputs and pre-moeling data. 
+  mod = paste0(myBiomodEM@models.projected) 
+  
+  for(i in mod){ #START of for loop
+  # project species - will pick best one
+  EM_projection <- biomod2::BIOMOD_EnsembleForecasting(myBiomodEM, #output from ensemble 
+                                                         proj.name = myRespName, #species name
+                                                         new.env = sp.clim.rasters[[myRespName]], #enviro matrix
+                                                         new.env.xy = myRespXY,
+                                                         models.chosen = mod[i])
+  print("Projection output file link:")
+  print(sp_projection@proj.out@link)
+  #read raster output
+  r = try(rast(EM_projection@proj.out@link))
+  
+  #Ensuring CRS 
+  if (inherits(r, "SpatRaster") && (is.na(crs(r)) || crs(r) == "")) {
+    message("Ensemble projection raster has no CRS. Assigning EPSG:4326 manually.")
+    crs(r) <- "EPSG:4326"}
+  
+  #write ouput with new name -- will be overwritten by the current timeperiod model since the species share the same name 
+  try(writeRaster(r, 
+              file = file.path(L2.em, paste0(gsub("\\.", "_", models[i]), 
+                                             "_EMproj_", time, "_", type, ".tif")), overwrite = TRUE))
+  
+  } #END of ensemble raster for loop
+  
+  } #END of function 
+
+
+
+
+
+
+
+

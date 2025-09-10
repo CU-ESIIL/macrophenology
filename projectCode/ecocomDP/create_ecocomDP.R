@@ -38,11 +38,11 @@ library(dplyr)
 library(taxonomyCleanr) # remotes::install_github("EDIorg/taxonomyCleanr")
 
 # Install a legacy version of EDIutils with table reading capabilities
-remotes::install_github("ropensci/EDIutils", ref = "deprecated")
+# remotes::install_github("ropensci/EDIutils", ref = "deprecated")
 library(EDIutils)
 
 # Install the development version of ecocomDP with the traits extension
-remotes::install_github("EDIorg/ecocomDP", ref = "158-traits-extension")
+# remotes::install_github("EDIorg/ecocomDP", ref = "158-traits-extension")
 library(ecocomDP)
 
 create_ecocomDP <- function(path,
@@ -75,7 +75,7 @@ create_ecocomDP <- function(path,
   
   # Add columns for the observation table -------------------------------------
   
-  names(flat)[names(flat) == "observation_date"] <- "observation_datetime"
+  names(flat)[names(flat) == "observation_date"] <- "datetime"
   names(flat)[names(flat) == "species_id"] <- "taxon_id"
   
   # Assuming that each sampling event is uniquely defined by a combination of
@@ -119,9 +119,7 @@ create_ecocomDP <- function(path,
   
   # Add columns for the dataset_summary table ---------------------------------
   
-  # TODO: Resume here
-  
-  dates <- flat$date %>% stats::na.omit() %>% sort()
+  dates <- flat$observation_datetime %>% stats::na.omit() %>% sort()
   
   # Use the calc_*() helper functions for consistency
   
@@ -132,14 +130,15 @@ create_ecocomDP <- function(path,
   flat$std_dev_interval_betw_years <- 
     ecocomDP::calc_std_dev_interval_betw_years(dates)
   flat$max_num_taxa <- length(unique(flat$taxon_name))
+  
+  west <- min(flat$longitude, na.rm = TRUE)
+  east <- max(flat$longitude, na.rm = TRUE)
+  south <- min(flat$latitude, na.rm = TRUE)
+  north <- max(flat$latitude, na.rm = TRUE)
   flat$geo_extent_bounding_box_m2 <- 
     ecocomDP::calc_geo_extent_bounding_box_m2(west, east, north, south)
   
   # Odds and ends -------------------------------------------------------------
-  
-  # Rename source columns with an ecocomDP equivalent (date to datetime)
-  
-  flat <- flat %>% rename(datetime = date)
   
   # The hard work is done! The flat table contains all the source data and 
   # more! We can now use the "create" functions to parse this table into the 

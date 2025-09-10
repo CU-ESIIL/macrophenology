@@ -29,6 +29,8 @@ Given the sensitivity of plant phenology to environmental change, there is an ur
 - **Katie Jones**: Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder CO
 - **Daijiang Li**: Assistant Professor, University of Arizona, Tucson, AZ
 - **Eric Sokol**: Working Group Tech Lead; Staff Scientist, National Ecological Observatory Network (NEON), Battelle, Boulder, CO
+- **Tong Qiu**: Assistant Professor, Duke University, Durham, NC; Guide the development of within-species response to climate through remote sensing and PhenoCam
+- **Hanshi Chen**: lead the within-species analysis using PhenoCam; Ph.D. student, Duke University, Durham, NC
 
 ## Deliverables Plan:
 - [Link to gsheet tracking deliverables](https://docs.google.com/spreadsheets/d/1YVxiqyyGMPf4KYvy3bQl-b1x0D8QNnOkLLXMpHJ2VT4/edit?gid=0#gid=0)

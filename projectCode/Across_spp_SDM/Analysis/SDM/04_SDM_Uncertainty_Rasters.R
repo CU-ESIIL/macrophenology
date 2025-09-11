@@ -1,8 +1,6 @@
 
 #Pullig the CV and CI rasters from the ensemble model 
 
-
-
 #########
 #Presets 
 #########
@@ -31,31 +29,32 @@ require(biomod2)
 ###########
 #Directories
 ##Data origin 
-getwd() #curious what it looks like 
-#ensemble folder for phenology - output folder
-#dir.create("Phenology") #create directory 
-L2.em = file.path(getwd(), "Phenology")
+#getwd() #curious what it looks like 
+mwd = "/iplant/home/esokol/esiil_macrophenology" 
+L2 = file.path(mwd, "L2/Across_spp_SDM")
+em = file.path(mwd, "SDM/SDM_uncertainty") #output file for results 
 
 #Ensure the directory exists!
-if (!dir.exists(L2.em)) {
-  dir.create(L2.em, recursive = TRUE)
-  message("Created directory at: ", L2.em)
+if (!dir.exists(em)) {
+  dir.create(em, recursive = TRUE)
+  message("Created directory at: ", em)
 } else {
-  message("Using existing directory at: ", L2.em)
+  message("Using existing directory at: ", em)
 }
 
-
+######
 #Data
+######
 #load objects 
-load("phenology_timeperiods_thinned_cleaned_focalspecies.RData", verbose = TRUE)
-load("range_timeperiods_thinned_cleaned_focalspecies.RData", verbose = TRUE)
+load(file.path(L2, "phenology_timeperiods_thinned_cleaned_focalspecies.RData"), verbose = TRUE)
+load(file.path(L2, "range_timeperiods_thinned_cleaned_focalspecies.RData"), verbose = TRUE)
 
-#read climate rasters 
+########### read climate rasters ############
 # 1. Save rasters into a list  
 #^: starts with, .*:  matches any characters, including spaces, after the underscore, \\.tif$: must end with .tif  
-tif_files_h = list.files(file.path(getwd()), 
+tif_files_h = list.files(file.path(L2, "sp_ranges_clim"), 
                          pattern = "^ClimRastS_H_cropped_.*\\.tif$", full.names = TRUE)
-tif_files_c = list.files(file.path(getwd()), 
+tif_files_c = list.files(file.path(L2, "sp_ranges_clim"), 
                          pattern = "^ClimRastS_C_cropped_.*\\.tif$", full.names = TRUE)
 # 2. Read each raster as a SpatRaster and store in a list
 rasters_h <- lapply(tif_files_h, rast)
@@ -68,23 +67,69 @@ species_names <- gsub("_", " ", species_names)
 sp.clim.rasters.h <- setNames(lapply(tif_files_h, rast), species_names)
 sp.clim.rasters.c <- setNames(lapply(tif_files_c, rast), species_names)
 
+############ rds file(s) ###############
+# Generalized loader for biomod RDS files
+load_biomod_rds <- function(wd, tag) {
+  # Build regex pattern dynamically
+  pattern <- paste0(".*_myBiomodModSM_", tag, "_.*\\.rds$")
+  
+  # Get file list
+  rds.files <- list.files(file.path(wd), pattern = pattern, full.names = TRUE)
+  
+  # Extract clean species names
+  species_names <- tools::file_path_sans_ext(basename(rds.files))
+  species_names <- gsub(paste0("_myBiomodModSM_", tag, "_"), "", species_names)
+  species_names <- gsub("_[0-9]{8}$", "", species_names)   # remove trailing date
+  species_names <- gsub("_", " ", species_names)           # replace underscores with spaces
+  
+  # Read RDS and return as named list
+  setNames(lapply(rds.files, readRDS), species_names)
+}
 
+#Phenology
+biomod.h.phe <- load_biomod_rds(wd=file.path(L2, "SDM/Phenology"), "h")
+biomod.c.phe <- load_biomod_rds(wd=file.path(L2, "SDM/Phenology"), "c")
+#Range
+biomod.h.rang <- load_biomod_rds(wd=file.path(L2, "SDM/Range"), "h")
+biomod.c.rang <- load_biomod_rds(wd=file.path(L2, "SDM/Range"), "c")
 
-#rds file(s)
-myBioModelOut = readRDS() 
-
-
+#############
+# Function 
+#############
+#Function inputs 
 #df: phe.h, phe.c, rang.h, rang.c
+#sp: species
 #time: H, C
 #type: Phenology, Range
 
-
-em.fun = function(df, time, type){
+em.fun = function(df, sp, time, type){
+  
+  #Setting working directory to where all initial SDM outputs are saved
+  #We need to set this because biomod2 will automatically look for supporting files that are in the folder
+  setwd(file.path(L2, "SDM", type)) 
+  
+  #To pull the species specific rds file!
+  if(time == "H"){
+    if(type == "Phenology") {
+      biomod.sm = biomod.h.phe
+    } else {
+      biomod.sm = biomod.h.rang
+    }
+  } else {
+    if(type == "Phenology") {
+      biomod.sm = biomod.c.phe
+    } else {
+      biomod.sm = biomod.c.rang
+    }
+  }
+  
+  biomid.sm = biomod.sm[[sp]]
+  
   ###########################
   ## i. `biomod2` formatting 
   ###########################
   #Select species name
-  myRespName = i
+  myRespName = sp
   # Get corresponding P data
   myResp = df[, myRespName]
   # Making sure there are no 0s
@@ -96,7 +141,7 @@ em.fun = function(df, time, type){
   ## iii. Pull best models 
   ###########################
   ##CALIBRATION: choose high scoring models
-  modeleval <- myBiomodModelOut@models.evaluation
+  modeleval <- biomod.sm@models.evaluation
   #Create a new data frame with stuff 
   modelevaldataset <- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]], 
                                 modeleval@val[["metric.eval"]], modeleval@val[["validation"]], 
@@ -121,12 +166,11 @@ em.fun = function(df, time, type){
   #full names of best models 
   bestmodsfullnames = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
   
-  
   ###########################
   ## iv. Ensemble model
   ###########################
   #Model ensemble models
-  myBiomodEM <- biomod2::BIOMOD_EnsembleModeling(bm.mod = myBiomodModelOut, #singles model output
+  myBiomodEM <- biomod2::BIOMOD_EnsembleModeling(bm.mod = biomod.sm, #singles model output
                                                    models.chosen = bestmodsfullnames, #vector of best models
                                                    em.by = 'all', #what models will be combined to ensemble
                                                    em.algo = c('EMcv', 'EMmean'), #types of ensembles models to be computed 
@@ -139,7 +183,7 @@ em.fun = function(df, time, type){
   #get today's date -  uncomment to save 
   today = format(Sys.Date(), format = "%Y%m%d")
   ##save biomodout file
-  saveRDS(myBiomodEM, file = file.path(L2.em, paste0(gsub("\\.", "_", myBiomodEM@sp.name),
+  saveRDS(myBiomodEM, file = file.path(em, paste0(gsub("\\.", "_", myBiomodEM@sp.name),
                                                 "_myBiomodEM_", time, "_", type, ".rds")))
   
   ###########################
@@ -171,13 +215,21 @@ em.fun = function(df, time, type){
                                              "_EMproj_", time, "_", type, ".tif")), overwrite = TRUE))
   
   } #END of ensemble raster for loop
-  
   } #END of function 
 
 
+#######################
+# Function per species
+#######################
+#Function to run all time-type combos for one species 
+em.fun.one.sp = function(sp1){
+  x1 = em.fun(df = phe.h, sp = sp1, time = "H", type = "Phenology")
+  x2 = em.fun(df = phe.c, sp = sp1, time = "C", type = "Phenology")
+  x3 = em.fun(df = phe.h, sp = sp1, time = "H", type = "Range")
+  x4 = em.fun(df = phe.c, sp = sp1, time = "C", type = "Range")
+}
 
-
-
-
-
+library(parallel)
+#sp_names is a vector of species to be processed
+x = parallel::mclapply(sp_names, FUN = em.fun.one.sp, mc.cores = 60) #core = num species to run in parallel 
 

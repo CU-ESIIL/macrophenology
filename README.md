@@ -22,7 +22,7 @@ Given the sensitivity of plant phenology to environmental change, there is an ur
 ## Group Members
 - **Sydne Record**: Working Group Co-Leader; Associate Professor, University of Maine
 - **Kai Zhu**: Working Group Co-Leader; Advise the Across spp CTI subgroup; Associate Professor, University of Michigan
-- **Lizbeth Amador**: Co-lead of the Across spp SDM subgroup; Ph.D. candidate, University of Maine Orono 
+- **Lizbeth Amador**: Co-lead of the Across spp SDM subgroup; M.S. candidate, University of Maine Orono 
 - **Rohit Jha**: Co-lead of the Across spp SDM subgroup; Ph.D. student, Louisiana State University, Baton Rouge, LA
 - **Yi Liu**: Co-lead of the Across spp CTI subgroup; Ph.D. candidate, University of Michigan
 - **Betsy von Holle**: Research Associate, George Washington University

@@ -2,6 +2,6 @@
 
 **2. fit_m4.R**: This script takes the difference data of phenology and range and fits it to a linear regression with random effects of species and space.
 
-**3. plots.R**: This script plots brms outputs 
+**3. plots.R**: This script plots brms (Bayesian Regression Model Stan) outputs. 
 
-**4. tables.R**: This script outputs tables from model outputs 
+**4. tables.R**: This script outputs tables from model outputs.

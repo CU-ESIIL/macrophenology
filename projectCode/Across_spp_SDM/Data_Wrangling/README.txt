@@ -15,6 +15,15 @@
 04_pulling_merged_occurrence_multimedia_iDigBio.R
 - merges unprocessed iDigBio occurrence data and the multimedia data
 
+04a_Get_FIA_Data.R
+- Code to extract data for species for Contiguous US from FIA (Forest Inventory and Analysis).
+
+04b_Get__BIEN_Data.R
+- Code to extract data for species for Contiguous US from BIEN (Botanical Information and Ecology Network).
+
+04C_Get_iDigBio_Data.R
+- Code to extract data for species for Contiguous US from iDigBio (Integrated Digitized Biocollections).
+
 05_Clean_iDIgBio_occurrence_multumedia_data.Rmd
 - uses 05a_idigbio.multimedia.clean.R function to clean data from step 4
 - done for each species 

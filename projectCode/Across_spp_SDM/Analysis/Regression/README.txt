@@ -4,4 +4,4 @@ fit_m4.R: This script takes the difference data of phenology and range and fits 
 
 plots.R: This script plots brms outputs 
 
-*tables.R: This script outputs tables from model outputs 
+tables.R: This script outputs tables from model outputs 

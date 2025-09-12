@@ -35,7 +35,8 @@ library(readr)
 library(lubridate)
 library(tidyr)
 library(dplyr)
-library(taxonomyCleanr) # remotes::install_github("EDIorg/taxonomyCleanr")
+library(uuid)
+library(taxadb)
 library(EDIutils)
 
 # Install the development version of ecocomDP with the traits extension
@@ -54,12 +55,14 @@ create_ecocomDP <- function(path,
   
   # Read source dataset -------------------------------------------------------
   
-  # Read the EML and data
+  # # Read the EML and data
   eml <- EDIutils::read_metadata(source_id, env=edi_environment)
-  entities <- EDIutils::read_data_entity_names(source_id, env=edi_environment)
-  entity_id <- entities[entities$entityName == "phenology_subset_ecocomDP", ][["entityId"]]
-  raw <- EDIutils::read_data_entity(source_id, entity_id, edi_environment)
-  data <- readr::read_csv(raw, na = c("NA", "-9999"))
+  # entities <- EDIutils::read_data_entity_names(source_id, env=edi_environment)
+  # entity_id <- entities[entities$entityName == "phenology_subset_ecocomDP", ][["entityId"]]
+  # raw <- EDIutils::read_data_entity(source_id, entity_id, edi_environment)
+  # data <- readr::read_csv(raw, na = c("NA", "-9999"))
+  # FIXME: Reading the L0 locally until the full L0 is published to EDI
+  data <- readr::read_csv("/Users/csmith/Data/macrophenology/Species_Peak_Open_Flowers_NPN_Herb.csv", na = c("NA", "-9999"))
   
   # Iterate over the EML dataTable attributes and extract the units into a 
   # dataframe where the columns are unit_[attributeName], with values being the 
@@ -80,38 +83,68 @@ create_ecocomDP <- function(path,
   
   # Add columns for the observation table -------------------------------------
   
+  # Remname observation_date to datetime
   names(data)[names(data) == "observation_date"] <- "datetime"
   
-  # Create event_id: Assuming that each sampling event is uniquely defined by a 
-  # combination of month and year
-  data$event_id <- data %>% group_by(
-    month = floor_date(data$datetime, "month"),
-    year = year(data$datetime)) %>% group_indices()
-  data <- data %>% arrange(event_id)
+  # There is an observation_id in the L0 table but it contains NA values, which
+  # is not allowed in ecocomDP. Therefore creating a new obs_uuid column that
+  # maps to the L1 observation_id. But preserve the original observation_id 
+  # column as a new column
+  data$observation_identifier <- data$observation_id
+  # Create uuid for each row in the data table
+  data$observation_id <- uuid::UUIDgenerate(n = nrow(data))
   
-  # Assume each record is an occurrence measurement
+  # Each record in the data is measurement of occurrence of a taxon. Here we
+  # create the primary variable of measurement in the observation table.
   data$variable_name <- "occurrence"
   data$value <- 1L
   data$unit <- "number"
   
-  # There is an observation_id in the L0 table but it contains NA values, which
-  # is not allowed in ecocomDP. Therefore renaming this L0 column to 
-  # observation_identifier, and creating an observation_id for ecocomDP below.
-  names(data)[names(data) == "observation_id"] <- "observation_identifier"
-  data$observation_id <- 1:nrow(data)
+  # The data package identifier in the EDI data repository
+  data$package_id <- source_id
+  
+  # Create event_id: Assuming that each sampling event is uniquely defined by a 
+  # combination of month and year
+  # data$event_id <- data %>% group_by(
+  #   month = floor_date(data$datetime, "month"),
+  #   year = year(data$datetime)) %>% group_indices()
+  # data <- data %>% arrange(event_id)
+  
+  # Count unique months and create a vector of UUIDs
+  num_groups <- length(unique(floor_date(data$datetime, "month")))
+  event_uuids <- UUIDgenerate(n = num_groups)
+  
+  # Group data and assign UUIDs using the group ID as an index
+  data <- data %>%
+    group_by(event_month_year = floor_date(datetime, "month")) %>%
+    # cur_group_id() provides an integer for each group (1, 2, 3...).
+    # This integer is used to select a UUID from the 'event_uuids' vector.
+    mutate(event_id = event_uuids[cur_group_id()]) %>%
+    ungroup() %>%
+    # Remove the temporary grouping column
+    select(-event_month_year) %>%
+    # Arrange the final data frame
+    arrange(event_id)
   
   # Add columns for the location table ----------------------------------------
   
   # A location_id is required but site_id in the data has NA's. Building a 
   # location_id by assuming unique combinations of latitude and longitude
+  location_map <- data %>%
+    distinct(latitude, longitude) %>%
+    mutate(location_id = uuid::UUIDgenerate(n = n()))
+  data <- data %>%
+    left_join(location_map, by = c("latitude", "longitude"))
   
-  data$location_id <- data %>% group_by(latitude, longitude) %>% group_indices()
+  # Though not required a location_name is nice to have. Combine loc_ with the
+  # location_id
+  data$location_name <- paste0("loc_", data$location_id)
   
   # Add columns for the taxon table -------------------------------------------
   
+  # Map names from L0 to L1
   names(data)[names(data) == "species_id"] <- "taxon_id"
   names(data)[names(data) == "species"] <- "taxon_name"
-  
   
   # While not required, resolving taxonomic entities to an authority system 
   # improves the discoverability and interoperability of the ecocomDP dataset. 
@@ -119,11 +152,27 @@ create_ecocomDP <- function(path,
   # matches against the Integrated Taxonomic Information System 
   # (ITIS; https://www.itis.gov/).
   
-  taxa_resolved <- taxonomyCleanr::resolve_sci_taxa(
-    x = unique(data$taxon_name),
-    data.sources = 3)
+  # The filter_name function queries your local database. It can return
+  # multiple matches for a given name.
+  resolved_data <- taxadb::filter_name(unique(data$taxon_name), provider = "itis")
+  input_df <- data.frame(taxa = unique(data$taxon_name))
+  # Process the resolved data to get the first match for each scientific name
+  first_matches <- resolved_data %>%
+    group_by(scientificName) %>%
+    slice(1) %>%
+    ungroup()
   
-  taxa_resolved <- taxa_resolved %>%
+  # Join the first matches back to the original input list
+  taxa_resolved <- input_df %>%
+    left_join(first_matches, by = c("taxa" = "scientificName")) %>%
+    # Rename columns to match the required output format
+    rename(
+      rank = taxonRank,
+      authority_id = taxonID
+    ) %>%
+    # Add the constant 'authority' column
+    mutate(authority = "ITIS") %>%
+    # Select and reorder columns into the final structure
     select(taxa, rank, authority, authority_id) %>%
     rename(taxon_rank = rank,
            taxon_name = taxa,
@@ -134,6 +183,7 @@ create_ecocomDP <- function(path,
   
   # Add columns for the dataset_summary table ---------------------------------
   
+  # Dates for calculations below
   dates <- data$datetime %>% stats::na.omit() %>% sort()
   
   # Use the calc_*() helper functions for consistency
@@ -184,10 +234,9 @@ create_ecocomDP <- function(path,
   location <- ecocomDP::create_location(
     L0_flat = data, 
     location_id = "location_id", 
-    location_name = c("site_id"), # Just to create table. Removed below.
+    location_name = c("DomainID", "state", "location_name"),
     latitude = "latitude", 
     longitude = "longitude")
-  location$location_name <- NULL
   
   taxon <- ecocomDP::create_taxon(
     L0_flat = data, 
@@ -204,6 +253,7 @@ create_ecocomDP <- function(path,
     L0_flat = data,
     observation_id = "observation_id", 
     variable_name = c(
+      "individual_id",
       "observation_identifier",
       "update_datetime",
       "phenophase_id",
@@ -212,7 +262,6 @@ create_ecocomDP <- function(path,
       "phenophase_status",
       "data_name",
       "year_rect",
-      "DomainID",
       "record_id",
       "references",
       "windowStart",
@@ -225,6 +274,7 @@ create_ecocomDP <- function(path,
       "tag_yr"
       ),
     unit = c(
+      "unit_individual_id",
       "unit_phenophase_id",
       "unit_day_of_year",
       "unit_year_rect",
@@ -241,17 +291,15 @@ create_ecocomDP <- function(path,
   location_ancillary <- ecocomDP::create_location_ancillary(
     L0_flat = data,
     location_id = "location_id",
-    variable_name = c("state", "site_id"),
+    variable_name = c("site_id"),
     unit = c("unit_site_id"))
   
   taxon_ancillary <- ecocomDP::create_taxon_ancillary(
     L0_flat = data,
     taxon_id = "taxon_id",
     variable_name = c(
-      "individual_id",
       "common_name",
-      "kingdom"),
-    unit = c("unit_individual_id"))
+      "kingdom"))
   
   # Create the variable_mapping table. This is optional but highly recommended
   # as it provides unambiguous definitions to variables and facilitates
@@ -351,8 +399,7 @@ create_ecocomDP <- function(path,
     geo_extent_bounding_box_m2 = "geo_extent_bounding_box_m2",
     dataset_level_bio_organization = "dataset_level_bio_organization",
     observation_finest_level = "observation_finest_level",
-    number_of_variables = "number_of_variables"
-    )
+    number_of_variables = "number_of_variables")
   
   # Write tables to file
   
@@ -429,7 +476,7 @@ create_ecocomDP <- function(path,
 
 
 create_ecocomDP(
-  path = ".",
+  path = "/Users/csmith/Data/macrophenology",
   source_id = "edi.2129.1",
   derived_id = "edi.2130.1"
 )

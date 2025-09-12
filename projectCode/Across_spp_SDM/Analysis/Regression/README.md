@@ -8,4 +8,6 @@
 
 **5. traitDB_dispersal_wrangling.R**:  This script analyzes dispersal traits across species.
 
-**6. uncertaintyHandling**: This script examines uncertainty associated with SDM predictions.
+**6. uncertaintyHandling.R**: This script examines uncertainty associated with SDM predictions.
+
+**7. MC_simulation.R**: The Monte Carlo null for non-independence compares the covariance between range and phenology

@@ -5,3 +5,7 @@
 **3. plots.R**: This script plots brms (Bayesian Regression Model Stan) outputs. 
 
 **4. tables.R**: This script outputs tables from model outputs.
+
+**traitDB_dispersal_wrangling.R**:  This script analyzes dispersal traits across species.
+
+**uncertaintyHandling**: This script examines uncertainty associated with SDM predictions.

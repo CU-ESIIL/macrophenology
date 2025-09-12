@@ -163,25 +163,25 @@ for(i in sp){
   #########################
   # x11()
   #Adjust margins to avoid legend clipping
-  par(mar = c(5, 4, 4, 6))  #Leave room for the scale bar on the right
-   #plot transparent conus to standardize the plot extents 
-  plot(conus, main = paste(i, "Difference in Peak Flowering Suitability (Curr - Hist)"),
-       col = NA, border=NA, lwd = 0.2, axes = FALSE)
-  #Adjust margins to avoid legend clipping
-  par(mar = c(5, 4, 4, 6))  #Leave room for the scale bar on the right
-  #plot raster
-  plot(em.dif,
-       breaks = breaks_fixed,
-       type = "continuous",
-       plg = list(
-         title = "Change in Prob", 
-         cex = 1,
-         at = legend_ticks, #specify tick locations
-         labels = as.character(legend_ticks)  #specify tick labels
-       ),
-       range = c(-1, 1),
-       axes = TRUE, add = TRUE)
-  
+  # par(mar = c(5, 4, 4, 6))  #Leave room for the scale bar on the right
+  #  #plot transparent conus to standardize the plot extents 
+  # plot(conus, main = paste(i, "Difference in Peak Flowering Suitability (Curr - Hist)"),
+  #      col = NA, border=NA, lwd = 0.2, axes = FALSE)
+  # #Adjust margins to avoid legend clipping
+  # par(mar = c(5, 4, 4, 6))  #Leave room for the scale bar on the right
+  # #plot raster
+  # plot(em.dif,
+  #      breaks = breaks_fixed,
+  #      type = "continuous",
+  #      plg = list(
+  #        title = "Change in Prob", 
+  #        cex = 1,
+  #        at = legend_ticks, #specify tick locations
+  #        labels = as.character(legend_ticks)  #specify tick labels
+  #      ),
+  #      range = c(-1, 1),
+  #      axes = TRUE, add = TRUE)
+  # 
   
   # Save raster to file
   out_path <- file.path(output, paste0(gsub(" ", "_", i), "_EMProj_diff_Phenology.tif"))

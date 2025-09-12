@@ -6,6 +6,6 @@
 
 **4. tables.R**: This script outputs tables from model outputs.
 
-**traitDB_dispersal_wrangling.R**:  This script analyzes dispersal traits across species.
+**5. traitDB_dispersal_wrangling.R**:  This script analyzes dispersal traits across species.
 
-**uncertaintyHandling**: This script examines uncertainty associated with SDM predictions.
+**6. uncertaintyHandling**: This script examines uncertainty associated with SDM predictions.

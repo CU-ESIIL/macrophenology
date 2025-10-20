@@ -113,7 +113,8 @@ for(i in sp){ #START of loop
   #Align current raster to historic raster if needed 
   if (!compareGeom(r.h.sp, r.c.sp)) {
     r.c.sp <- resample(r.c.sp, r.h.sp, method = "near") #use "near" since it's binary
-  } else{message("Rasters in the same extent!")}
+  message("2. Rasters resampled to the same extent")
+    } else{message("2. Rasters in the same extent!")}
   
   #Adjust the naming convention for each layer within rasters
   names(r.h.sp) <- gsub(".*_EMcv.*", "cv", names(r.h.sp))
@@ -123,11 +124,11 @@ for(i in sp){ #START of loop
   names(r.c.sp) <- gsub(".*_EMmean.*", "mean", names(r.c.sp))
   
   
-  message("2. Calculate the Mean difference for: ", i)
+  message("3. Calculate the Mean difference for: ", i)
   #Calculate differences 
   mu.dif = r.c.sp$mean - r.h.sp$mean
   
-  message("3. Calculate the total error for: ", i)
+  message("4. Calculate the total error for: ", i)
   #Calculate standard deviation for each time period
   sd1 = r.c.sp$cv*r.c.sp$mean
   sd2 = r.h.sp$cv*r.h.sp$mean
@@ -203,10 +204,10 @@ length(unique(em.dif.df$species))
 #Write to CSV
 write.csv(
   em.dif.df,
-  file = file.path(L2, paste0("AllSpecies_EMProj_diff_", type, ".csv")),
+  file = file.path(output, paste0("AllSpecies_EMProj_diff_", type, ".csv")),
   row.names = FALSE)
 
-message("5. Outputted csv for:", type)
+message("Outputted csv for: ", type)
 
 } #END of function 
 

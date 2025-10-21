@@ -177,18 +177,20 @@ for (species in names(em.dif.rasters)) { #START for loop
   colnames(df)[1:2] <- c("longitude", "latitude")
   
   #Pivot from wide (mean/sd layers) to long format (metric/val)
-  df_long <- df %>%
-    pivot_longer(
-      cols = -c(longitude, latitude),
-      names_to = "metric",
-      values_to = "val"
-    )
+  # df_long <- df %>%
+  #   pivot_longer(
+  #     cols = -c(longitude, latitude),
+  #     names_to = "metric",
+  #     values_to = "val"
+  #   )
   
   #Add species column (clean underscores, keep Genus species)
-  df_long$species <- sub("^((\\w+\\s+\\w+)).*", "\\1", gsub("_", " ", species))
+  df$species <- sub("^((\\w+\\s+\\w+)).*", "\\1", gsub("_", " ", species))
+  # df_long$species <- sub("^((\\w+\\s+\\w+)).*", "\\1", gsub("_", " ", species))
   
+  message(str(df))
   #Store
-  df.list[[species]] <- df_long
+  df.list[[species]] <- df
   
   message("Data frame logged for: ", species)
 } #END for loop

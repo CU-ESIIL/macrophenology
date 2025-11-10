@@ -84,6 +84,7 @@ mc_null_test <- function(y_mean, y_sd, x_mean, x_sd,
 #working directories
 mwd = "~/data-store/home/lamador/Data"
 L2 = file.path(mwd, "L2")
+grahs = file.path(L2, "Graphs")
 load(file = file.path(L2, "Subset_ModelData_NoOutliers.RData"), verbose = TRUE)
 dat = sub.data
 ## variables of importance: pdiff, psd, rdiff, rsd, domain_id, funct_tpe, nativity, dispersal
@@ -125,7 +126,7 @@ x.time = system.time({ #START timer
 
 message("3) Saving output")
 #save output
-sink(file.path(L2, "MC_correlation_check.txt"))
+sink(file.path(graphs, "MC_correlation_check.txt"))
 print(paste0("Total run time: ", round(x.time[3]/60), " minutes"))
 cat("\n1) Correlation test (global permutations)....\n")
 cat("Monte Carlo p-value \n")

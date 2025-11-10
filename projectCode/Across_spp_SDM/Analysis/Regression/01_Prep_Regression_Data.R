@@ -206,14 +206,14 @@ save(sub.data, file=file.path(L2, "Subset_ModelData_NoOutliers.RData"))
 
 #Save summary info
 sink(file= file.path(L2, "All_Species_Info_Tables_Range_Phenology_ModelData_Subset.txt"))
-print("resolution: ", r)
+print(paste0("resolution: ", r))
+cat("\n")
 str(sub.data)
-
 cat("\n range of psd\n")
 range(sub.data$psd)
-cat("\n range of psd\n")
+cat("\n range of rsd\n")
 range(sub.data$rsd)
-
+cat("\n")
 unique(sub.data$species)
 unique(sub.data$domain_id)
 unique(sub.data$dispersal)
@@ -221,28 +221,48 @@ unique(sub.data$functional_type)
 
 a = sub.data %>% count(nativity, funct_type, dispersal)
 print(a)
-
-b = sub.data %>%
-  group_by(species, nativity, funct_type, dispersal, domain_id) %>%
-  summarise(n())
-print(b, n = length(b))
-
+cat("\n")
 table(sub.data$nativity)
 table(sub.data$funct_type)
-table(sub.data$genus_common_name)
-table(sub.data$species)
+table(sub.data$dispersal)
 
-cat("\number ofspecies\n")
+cat("\n number of species")
 c = sub.data %>%
   group_by(species, nativity, funct_type, dispersal) %>%
   summarise(n())
+cat("\n")
 table(c$nativity)
 table(c$funct_type)
 table(c$dispersal)
+cat("\n")
 c1 = c %>%
   group_by(nativity, funct_type, dispersal) %>%
   summarise(n())
 print(c1)
+cat("\n")
+c1 = c %>%
+  group_by(nativity, funct_type) %>%
+  summarise(n())
+print(c1)
+cat("\n")
+c1 = c %>%
+  group_by(funct_type, dispersal) %>%
+  summarise(n())
+print(c1)
+cat("\n")
+c1 = c %>%
+  group_by(nativity, dispersal) %>%
+  summarise(n())
+print(c1)
+cat("\n")
+table(sub.data$genus_common_name)
+table(sub.data$species)
+cat("\n")
+cat("\n")
+b = sub.data %>%
+  group_by(species, nativity, funct_type, dispersal, domain_id) %>%
+  summarise(n())
+print(b, n = length(b$species))
 
 sink()
 

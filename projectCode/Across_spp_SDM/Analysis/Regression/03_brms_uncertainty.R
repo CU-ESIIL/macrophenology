@@ -34,8 +34,8 @@ mode(dom.mat) <- "numeric"
 ######################################
 message("1) Create calibration and validation groups")
 #Dummy data for testing code [remove slicing for actual runs]
-sub.data <- sub.data %>%
-  slice_sample(n = 1000)   # keep exactly n rows
+# sub.data <- sub.data %>%
+#   slice_sample(n = 1000)   # keep exactly n rows
 #Training & testing groups -- for model validation
 set.seed(run)   # Set a seed value for reproducability purposes in this document
 #Randomly select 70% of the data (rows)
@@ -184,7 +184,7 @@ x.time = system.time({ #START timer
     seed    = 20250909,
     control = list(adapt_delta = 0.95, max_treedepth = 13))
   message(cat("\tModeling complete! ... Saving model fit"))
-  saveRDS(file = file.path(L2, paste0("brms_fit_training_Run", run, "_nativity.rds")))
+  saveRDS(fit, file = file.path(L2, paste0("brms_fit_training_Run", run, "_nativity.rds")))
   message(cat("\tPredicting using the testing dataset"))
   #predict testing data using the training model
   fit.t <- predict(fit, newdata = test.dat1)
@@ -194,14 +194,6 @@ x.time = system.time({ #START timer
   #--- save output ---
   message(cat("\tsaving output"))
   sink(file.path(graphs, paste0("brms_fit_Run", run, "_nativity_output.txt")))
-  cat("Training\n")
-  cat("Summary:\n"); print(summary(fit))
-  cat("\nPrior summary:\n"); print(prior_summary(fit))
-  cat("\nLook for the coefficient named b_me... — that's the slope for the latent RANGE.\n")
-  print(fit)
-  cat("\nTesting\n")
-  cat("Summary:\n"); print(summary(fit.t))
-  print(fit.t)
   #Posterior Mean predictions
   #Posterior expected value per observation
   train_fitted <- fitted(fit)  # matrix with Estimate, Est.Error, Q2.5, Q97.5
@@ -212,7 +204,16 @@ x.time = system.time({ #START timer
   cat("training: ", round(rmse_train, 4)); cat("\ntesting: ", round(rmse_test, 4))
   cat("\nR^2\n")
   r2_train <- cor(train.dat1$pdiff, train_mean)^2; r2_test  <- cor(test.dat1$pdiff, test_mean)^2
-  cat("training: ", round(r2_train, 4)); cat("\ntesting: ", round(r2_test, 4))
+  cat("\ntraining: ", round(r2_train, 4)); cat("\ntesting: ", round(r2_test, 4))
+  cat("\n")
+  cat("\nTraining\n")
+  cat("Summary:\n"); print(summary(fit))
+  cat("\nPrior summary:\n"); print(prior_summary(fit))
+  cat("\nLook for the coefficient named b_me... — that's the slope for the latent RANGE.\n")
+  print(fit)
+  cat("\nTesting\n")
+  cat("Summary:\n"); print(summary(fit.t))
+  print(fit.t)
   sink()
   #-------------------
 }) #END timer

@@ -24,7 +24,7 @@ graphs = file.path(L2, "Graphs")
 load(file = file.path(L2, "Subset_ModelData_NoOutliers.RData"), verbose = TRUE) # variables of importance: pdiff, psd, rdiff, rsd, domain_id, funct_tpe, nativity, dispersal
 dim(sub.data)
 #NEON Domain adjaceny table -- Important to read as a matrix!
-dom.mat <- as.matrix(read.csv(file.path(L2, "neon_adjacency_matrix.csv"),header = TRUE, row.names = 1, check.names = FALSE))
+dom.mat <- as.matrix(read.csv(file.path(L2, "neon_adjacency_matrix.csv"), header = TRUE, row.names = 1, check.names = FALSE))
 #Making sure it's numeric
 mode(dom.mat) <- "numeric"
 
@@ -69,7 +69,7 @@ test.dat1 = test.dat[test.dat$funct_type == "non-woody", ]
 #dev.off()
 
 #Model with nativity (No functional type)
-pdf(file = file.path(L2, "Graphs", paste0("brms_fit_LinearAssumptions_Run", run, "_nativity.pdf")))
+pdf(file = file.path(L2, paste0("brms_fit_LinearAssumptions_Run", run, "_nativity.pdf")))
 mod <- lm(pdiff ~ rdiff + latitude + nativity + dispersal + rdiff*latitude, data = train.dat1)
 #1. Linearity & Homoscedasticity
 par(mfrow = c(2,2))
@@ -184,40 +184,13 @@ x.time = system.time({ #START timer
     seed    = 20250909,
     control = list(adapt_delta = 0.95, max_treedepth = 13))
   message(cat("\tModeling complete! ... Saving model fit"))
-  saveRDS(fit, file = file.path(L2, paste0("brms_fit_training_Run", run, "_nativity.rds")))
+  saveRDS(fit, file = file.path(L2, paste0("brms_fit_Run", run, "_training_nativity.rds")))
   message(cat("\tPredicting using the testing dataset"))
   #predict testing data using the training model
   fit.t <- predict(fit, newdata = test.dat1)
-  saveRDS(fit.t, file = file.path(L2, paste0("brms_fit_testing_Run", run, "_nativity.rds")))
+  saveRDS(fit.t, file = file.path(L2, paste0("brms_fit_Run", run, "_testing_nativity.rds")))
 
-
-  #--- save output ---
-  message(cat("\tsaving output"))
-  sink(file.path(graphs, paste0("brms_fit_Run", run, "_nativity_output.txt")))
-  #Posterior Mean predictions
-  #Posterior expected value per observation
-  train_fitted <- fitted(fit)  # matrix with Estimate, Est.Error, Q2.5, Q97.5
-  # Posterior mean predictions
-  train_mean <- train_fitted[, "Estimate"]; test_mean <- fit.t[, "Estimate"]  # if predict() returns a matrix with Estimate
-  cat("\nRMSE\n")
-  rmse_train <- sqrt(mean((train.dat1$pdiff - train_mean)^2)); rmse_test <- sqrt(mean((test.dat1$pdiff - test_mean)^2))
-  cat("training: ", round(rmse_train, 4)); cat("\ntesting: ", round(rmse_test, 4))
-  cat("\nR^2\n")
-  r2_train <- cor(train.dat1$pdiff, train_mean)^2; r2_test  <- cor(test.dat1$pdiff, test_mean)^2
-  cat("\ntraining: ", round(r2_train, 4)); cat("\ntesting: ", round(r2_test, 4))
-  cat("\n")
-  cat("\nTraining\n")
-  cat("Summary:\n"); print(summary(fit))
-  cat("\nPrior summary:\n"); print(prior_summary(fit))
-  cat("\nLook for the coefficient named b_me... — that's the slope for the latent RANGE.\n")
-  print(fit)
-  cat("\nTesting\n")
-  cat("Summary:\n"); print(summary(fit.t))
-  print(fit.t)
-  sink()
-  #-------------------
 }) #END timer
-
 
 sink(file = file.path(graphs, paste0("brms_fit_Run", run, "_nativity_TotalRunTime.txt")))
 min = round(x.time[3]/60)
@@ -233,3 +206,33 @@ if(min > 59){
 }
 sink()
 
+
+#--- save output ---
+message(cat("\tsaving output"))
+#Posterior Mean predictions
+#Posterior expected value per observation
+train_fitted <- fitted(fit)  # matrix with Estimate, Est.Error, Q2.5, Q97.5
+# Posterior mean predictions
+# train_mean <- posterior_predict(fit, ndraws = 200)
+train_mean <- train_fitted[, "Estimate"]
+test_mean <- fit.t[, "Estimate"]  # if predict() returns a matrix with Estimate
+rmse_train <- sqrt(mean((train.dat1$pdiff - train_mean)^2)); rmse_test <- sqrt(mean((test.dat1$pdiff - test_mean)^2))
+r2.train <- cor(train.dat1$pdiff, train_mean)^2; r2.test  <- cor(test.dat1$pdiff, test_mean)^2
+# r2.train = bayes_R2(fit); r2.test = bayes_R2(fit.t)
+
+sink(file.path(graphs, paste0("brms_fit_Run", run, "_nativity_output.txt")))
+cat("\nRMSE\n")
+cat("training: ", round(rmse_train, 4)); cat("\ntesting: ", round(rmse_test, 4))
+cat("\nR^2\n")
+cat("\ntraining: ", r2.train); cat("\ntesting: ", r2.test)
+cat("\n")
+cat("\nTraining\n")
+cat("Summary:\n"); print(summary(fit))
+cat("\nPrior summary:\n"); print(prior_summary(fit))
+cat("\nLook for the coefficient named b_me... — that's the slope for the latent RANGE.\n")
+print(fit)
+cat("\nTesting\n")
+cat("Summary:\n"); print(summary(fit.t))
+print(fit.t)
+sink()
+#-------------------

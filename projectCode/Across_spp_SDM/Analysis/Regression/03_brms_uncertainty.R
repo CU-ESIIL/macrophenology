@@ -153,8 +153,8 @@ x.time = system.time({ #START timer
   # cat("training: ", round(r2_train, 4)); cat("\ntesting: ", round(r2_test, 4))
   # sink()
   #-------------------
-
-
+  
+  
   #----------- All non-woody (w/ nativity status) -----------
   message("3) Begin second brms model -- All non-woody, w/ nativity")
   #Removing woody species (and therefor function type) from the model (only non-woody invasive spp.)
@@ -189,7 +189,7 @@ x.time = system.time({ #START timer
   #predict testing data using the training model
   fit.t <- predict(fit, newdata = test.dat1)
   saveRDS(fit.t, file = file.path(L2, paste0("brms_fit_Run", run, "_testing_nativity.rds")))
-
+  
 }) #END timer
 
 sink(file = file.path(graphs, paste0("brms_fit_Run", run, "_nativity_TotalRunTime.txt")))

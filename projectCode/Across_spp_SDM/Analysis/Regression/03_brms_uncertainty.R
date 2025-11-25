@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
   if (!requireNamespace("tidyverse", quietly = TRUE)) install.packages("tidyverse"); library(tidyverse)
   if (!requireNamespace("brms", quietly = TRUE)) install.packages("brms"); library(brms)
   if (!requireNamespace("caret", quietly = TRUE)) install.packages("caret"); library(caret)
+  if (!requireNamespace("sjPlot", quietly = TRUE)) install.packages("sjPlot"); library(sjPlot)
 })
 
 #########
@@ -48,8 +49,10 @@ dim(train.dat); dim(test.dat)
 #save space
 rm(sub.data)
 #Training data without woody species (for second model)
-train.dat1 = train.dat[train.dat$funct_type == "non-woody", ]
-test.dat1 = test.dat[test.dat$funct_type == "non-woody", ]
+train.dat1 = train.dat %>%
+  filter(funct_type == "non-woody")
+test.dat1 = test.dat %>%
+  filter(funct_type == "non-woody")
 
 
 #####################
@@ -180,15 +183,46 @@ x.time = system.time({ #START timer
     family  = gaussian(),           # identity link on [-1, 1]
     prior   = priors,
     chains  = 4, iter = 3000, warmup = 1000, cores = 4,
-    #threads = threading(16),
+    threads = threading(16),
     seed    = 20250909,
     control = list(adapt_delta = 0.95, max_treedepth = 13))
   message(cat("\tModeling complete! ... Saving model fit"))
   saveRDS(fit, file = file.path(L2, paste0("brms_fit_Run", run, "_training_nativity.rds")))
   message(cat("\tPredicting using the testing dataset"))
   #predict testing data using the training model
-  fit.t <- predict(fit, newdata = test.dat1)
+  fit.t <- predict(fit, newdata = test.dat1, allow_new_levels = TRUE, summary = FALSE)
   saveRDS(fit.t, file = file.path(L2, paste0("brms_fit_Run", run, "_testing_nativity.rds")))
+  
+  
+  #----------- All non-woody (w/ nativity status) :: No priors -----------
+  # message("4) Begin second brms model -- All non-woody, w/ nativity; NO PRIORS")
+  # #Removing woody species (and therefor function type) from the model (only non-woody invasive spp.)
+  # #Formula
+  # form <- bf(
+  #   pdiff  ~
+  #     rdiff + latitude + nativity + dispersal + rdiff*latitude +
+  #     (1 | species) + #random effect
+  #     car(dom.mat, gr = domain_id)) #adjacency matrix
+  # message(form)
+  # 
+  # #Fitt model
+  # fit <- brm(
+  #   formula = form,
+  #   data    = train.dat1,
+  #   data2 = list(dom.mat=dom.mat), # adjacency matrix data
+  #   family  = gaussian(),           # identity link on [-1, 1]
+  #   #prior   = priors,
+  #   chains  = 4, iter = 3000, warmup = 1000, cores = 4,
+  #   #threads = threading(16),
+  #   seed    = 20250909,
+  #   #control = list(adapt_delta = 0.95, max_treedepth = 13)
+  #   )
+  # message(cat("\tModeling complete! ... Saving model fit"))
+  # saveRDS(fit, file = file.path(L2, paste0("brms_fit_Run", run, "_training_nativity_NP.rds")))
+  # message(cat("\tPredicting using the testing dataset"))
+  # #predict testing data using the training model
+  # fit.t <- predict(fit, newdata = test.dat1)
+  # saveRDS(fit.t, file = file.path(L2, paste0("brms_fit_Run", run, "_testing_nativity_NP.rds")))
   
 }) #END timer
 
@@ -211,27 +245,29 @@ sink()
 message(cat("\tsaving output"))
 #Posterior Mean predictions
 #Posterior expected value per observation
-train_fitted <- fitted(fit)  # matrix with Estimate, Est.Error, Q2.5, Q97.5
+# train_fitted <- fitted(fit)  # matrix with Estimate, Est.Error, Q2.5, Q97.5
 # Posterior mean predictions
-# train_mean <- posterior_predict(fit, ndraws = 200)
-train_mean <- train_fitted[, "Estimate"]
-test_mean <- fit.t[, "Estimate"]  # if predict() returns a matrix with Estimate
-rmse_train <- sqrt(mean((train.dat1$pdiff - train_mean)^2)); rmse_test <- sqrt(mean((test.dat1$pdiff - test_mean)^2))
-r2.train <- cor(train.dat1$pdiff, train_mean)^2; r2.test  <- cor(test.dat1$pdiff, test_mean)^2
+# train_fitted <- posterior_predict(fit, ndraws = 200)
+# train_mean <- train_fitted[, "Estimate"]
+# train_mean <- colMeans(train_fitted)
+# test_mean <- fit.t[, "Estimate"]  # if predict() returns a matrix with Estimate
+# rmse_train <- sqrt(mean((train.dat1$pdiff - train_mean)^2)); rmse_test <- sqrt(mean((test.dat1$pdiff - test_mean)^2))
+# r2.train <- cor(train.dat1$pdiff, train_mean)^2; r2.test  <- cor(test.dat1$pdiff, test_mean)^2
 # r2.train = bayes_R2(fit); r2.test = bayes_R2(fit.t)
 
 sink(file.path(graphs, paste0("brms_fit_Run", run, "_nativity_output.txt")))
-cat("\nRMSE\n")
-cat("training: ", round(rmse_train, 4)); cat("\ntesting: ", round(rmse_test, 4))
-cat("\nR^2\n")
-cat("\ntraining: ", r2.train); cat("\ntesting: ", r2.test)
-cat("\n")
+# cat("\nRMSE\n")
+# cat("training: ", round(rmse_train, 4)); cat("\ntesting: ", round(rmse_test, 4))
+# cat("\nR^2\n")
+# cat("\ntraining: ", r2.train); cat("\ntesting: ", r2.test)
+# cat("\n")
 cat("\nTraining\n")
 cat("Summary:\n"); print(summary(fit))
-cat("\nPrior summary:\n"); print(prior_summary(fit))
+cat("\nPrior summary:\n"); tab_model(fit) #print(prior_summary(fit))
 cat("\nLook for the coefficient named b_me... — that's the slope for the latent RANGE.\n")
 print(fit)
 cat("\nTesting\n")
+tab_model(fit.t)
 cat("Summary:\n"); print(summary(fit.t))
 print(fit.t)
 sink()

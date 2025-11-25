@@ -4,10 +4,6 @@
 
 #This script plots brms outputs 
 
-#model type and run # settings 
-m = "4"
-run = "3"
-
 ###########
 # Presets
 ###########
@@ -44,9 +40,9 @@ if (!requireNamespace("parallel", quietly = TRUE)) {
 ##############
 # Directories
 ##############
-getwd()  # Print current working directory
-# graphs <- "/users/PUOM0017/lamad/esiil_macrophenology/analysis/4-regression/Graphs"
-graphs <- file.path(getwd(), "Graphs")
+mwd = "~/data-store/home/lamador/Data"
+L2 = file.path(mwd, "L2")
+graphs = file.path(L2, "Graphs")
 
 if (!dir.exists(graphs)) {
   dir.create(graphs, recursive = TRUE)
@@ -60,54 +56,54 @@ if (!dir.exists(graphs)) {
 # Data
 #########
 # load(file = file.path("/users/PUOM0017/lamad/esiil_macrophenology/Data/L2/Subset_Data_ModelData_NoOutliers.RData"), verbose = TRUE)
-load(file = file.path("Subset_Data_ModelData_NoOutliers.RData"), verbose = TRUE)
+load(file = file.path(L2, "Subset_ModelData_NoOutliers.RData"), verbose = TRUE)
 
-fitb = readRDS(file = paste0("fitb_", m, "_training_R", run, ".rds"))
-fitt = readRDS(file = paste0("fitb_", m, "_testing_R", run, ".rds"))
-
-#for file nameing 
-mod = paste0("Mod", m)
 
 #function to plot both training & testing models
-fit.plot <- function(fit, mod, type, run){
+#type: nativity or nah
+#group: training or testing 
+#run: r number
+fit.plot <- function(run, group, type){
   message("Plotting!")
   #backing up name
-  fit = fit
+  fit = readRDS(file = file.path(L2, paste0("brms_fit_Run", run, "_", group, "_", type, ".rds")))
   #sample for re-predictions 
   n = 10
   
   ####################
-  # Model Convergence
+  # 1. Model Convergence
   ####################
-  pdf(file=file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_convergence.pdf")))
+  pdf(file = file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type, "_Convergence.pdf")))
   #plot dist
-  plot(fit)
+  p = plot(fit)
+  p
   # Posterior means + intervals
-  mcmc_plot(fit, type = "areas", prob = 0.95)
+  p = mcmc_plot(fit, type = "areas", prob = 0.95)
+  p
   dev.off()
-  message("Plotted & saved brms convergence plots!")
+  message("1) Plotted & saved brms convergence plots!")
   
   
   #############
-  # Box plots
+  # 2. Box plots
   #############
   #relationships with pdiff
-  #pdiff ~ status 
-  p = plot(conditional_effects(fit, effects = "status"))[[1]]
+  #pdiff ~ nativity
+  p = plot(conditional_effects(fit, effects = "nativity"))[[1]]
   p + theme_minimal() +
     theme(plot.background = element_rect(fill = "gray99", color = NA),
-      axis.text = element_text(size = 22),
-      # axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-      axis.title = element_text(size = 22),
-      plot.title = element_text(size = 22, hjust = 0.5),
-      legend.text = element_text(size = 22),
-      legend.title = element_text(size = 22))
+          axis.text = element_text(size = 22),
+          # axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_pdiff_status_boxplots.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type, "_Boxplots_pdiff_nativity.png")), last_plot(),
          width = 18, height = 11, units = "in", dpi = 600)
   
-  #pdiff ~ functional type
-  p = plot(conditional_effects(fit, effects = "functional_type"))[[1]]
+  #pdiff ~ dispersal
+  p = plot(conditional_effects(fit, effects = "dispersal"))[[1]]
   p + theme_minimal() +
     theme(
       plot.background = element_rect(fill = "gray99", color = NA),
@@ -118,15 +114,14 @@ fit.plot <- function(fit, mod, type, run){
       legend.text = element_text(size = 22),
       legend.title = element_text(size = 22)
     )
-  
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_pdiff_functype_boxplots.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_Boxplots_pdiff_dispersal.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600)
   
-  message("Plotted & saved brms boxplots plots!")
+  message("2) Plotted & saved brms boxplots plots!")
   
   
   ########################### 
-  # Plot 1: Coefficient plot 
+  # 3. Coefficient plot 
   ###########################
   #version 1
   mcmc_plot(fit, type = "intervals", prob = 0.95, point_size = 5, # make points larger 
@@ -134,7 +129,7 @@ fit.plot <- function(fit, mod, type, run){
     geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.7) +
     theme(text = element_text(size = 22))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_coefficients_V1_poster.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_Coefficients_V1_poster.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600)
   
   
@@ -158,9 +153,9 @@ fit.plot <- function(fit, mod, type, run){
     scale_x_discrete(labels = c(
       "b_Intercept" = "Intercept",
       "b_rdiff" = "Change in Range",
-      "b_statusI" = "Status (Invasive)",
+      "b_nativityI" = "nativity(Invasive)",
       "b_latitude" = "Latitude",
-      "b_rdiff:statusI" = "Change in Range × Status (Invasive)",
+      "b_rdiff:nativityI" = "Change in Range × nativity(Invasive)",
       "b_rdiff:latitude" = "Change in Range × Latitude",
       "b_functional_typeEvergreenbroadleaf" = "Evergreen Broadleaf",
       "b_functional_typeSemiMevergreenforb" = "Semi-evergreen Forb", 
@@ -184,21 +179,31 @@ fit.plot <- function(fit, mod, type, run){
           legend.justification = c("left", "bottom"),
           plot.margin = margin(10, 70, 10, 10))  # add a bit of right margin so legend isn’t clipped
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_coefficients_V2_poster.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_Coefficients_V2_poster.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600, limitsize=FALSE)
   
   rm(coef_df, fixef_df); gc()
-  message("Plotted & saved coefficient plot!")
+  message("3) Plotted & saved coefficient plot!")
   
   
   ################################# 
-  # Plot 2: Simple regression line
+  # 4) Simple regression line
   ################################# 
+  # newdata_grid <- sub.data %>%
+  #   select(rdiff, dispersal, latitude, nativity, species, domain_id) %>%
+  #   distinct() %>%
+  #   slice_sample(n = 1000)
   newdata_grid <- sub.data %>%
-    select(rdiff, functional_type, latitude, status, species, domain_id) %>%
+    select(rdiff, dispersal, latitude, nativity, species, domain_id) %>%
     distinct() %>%
     slice_sample(n = 1000)
-  preds_simple <- add_predicted_draws(fit, newdata = newdata_grid, ndraws = n)
+  # Match factor levels exactly
+  newdata_grid$species <- factor(newdata_grid$species,
+                                 levels = unique(fit$data$species))
+  newdata_grid$domain_id <- factor(newdata_grid$domain_id,
+                                   levels = unique(fit$data$domain_id))
+  
+  preds_simple <- add_predicted_draws(fit, newdata = newdata_grid, allow_new_levels = TRUE, ndraws = n)
   
   # Plot with posterior predictive intervals
   model_fit <- preds_simple %>%
@@ -206,28 +211,28 @@ fit.plot <- function(fit, mod, type, run){
     stat_lineribbon(aes(y = .prediction), .width = c(.95, .80, .50), alpha = 0.5, colour = "black") +
     scale_fill_brewer(palette = "Greys") +
     labs(y = "Change in Phenology\n", x = "\nChange in Range",
-      color = "CI",
-      fill = "CI") +
+         color = "CI",
+         fill = "CI") +
     theme_bw() +
     theme(plot.background = element_rect(fill = "gray99", color = NA),
-      axis.text = element_text(size = 22),
-      axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-      axis.title = element_text(size = 22),
-      plot.title = element_text(size = 22, hjust = 0.5),
-      legend.text = element_text(size = 22),
-      legend.title = element_text(size = 22),
-      legend.position = c(0.92, 0.1),
-      legend.box.background = element_rect(fill = "white", color = "grey99"))
+          axis.text = element_text(size = 22),
+          axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22),
+          legend.position = c(0.92, 0.1),
+          legend.box.background = element_rect(fill = "white", color = "grey99"))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_pdiff_rdiff_poster.png")), model_fit,
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_LinearPlot_pdiff_rdiff_poster.png")), model_fit,
          width = 16, height = 11, units = "in", dpi = 600)
   
   rm(model_fit, newdata_grid, preds_simple); gc()
-  message("Plotted & saved simple regression plot!")
+  message("4. Plotted & saved simple regression plot!")
   
   
   ##################################################  
-  # Plot 3: Interactions grouped by latitude region 
+  # 5) Interactions grouped by latitude region 
   ##################################################  
   sample_data <- sub.data %>%
     mutate(
@@ -239,109 +244,113 @@ fit.plot <- function(fit, mod, type, run){
                                    levels = c("Low (<30°)", "Mid (30°–60°)", "High (>60°)"))
   #Add predicted values per lat_region
   preds_lat_region <- sample_data %>%
-   group_by(lat_region) %>%
-   add_epred_draws(fit, ndraws = n)  #reduce ndraws if needed for speed
+    group_by(lat_region) %>%
+    add_epred_draws(fit, allow_new_levels = TRUE, ndraws = n)  #reduce ndraws if needed for speed
   #plot
   ggplot(preds_lat_region, aes(x = rdiff, y = .epred, color = lat_region, fill = lat_region)) +
     stat_lineribbon(.width = c(0.95, 0.8), alpha = 0.25) +
     geom_line(stat = "summary", fun = mean, linewidth = 3) +
     labs(x = "Range Difference (rdiff)", y = "Predicted Phenology Difference (pdiff)",
-      color = "Latitude Region",
-      fill = "Latitude Region") +
+         color = "Latitude Region",
+         fill = "Latitude Region") +
     theme_minimal() +
     theme(plot.background = element_rect(fill = "gray99", color = NA),
-      axis.text = element_text(size = 22),
-      axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-      axis.title = element_text(size = 22),
-      plot.title = element_text(size = 22, hjust = 0.5),
-      legend.text = element_text(size = 22),
-      legend.title = element_text(size = 22),
-      legend.position = c(0.92, 0.1),
-      legend.box.background = element_rect(fill = "white", color = "grey99"))
+          axis.text = element_text(size = 22),
+          axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22),
+          legend.position = c(0.92, 0.1),
+          legend.box.background = element_rect(fill = "white", color = "grey99"))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_latitude_interaction_cat_poster.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type, "_Interaction_latitude_cat_poster.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600)
   
   rm(preds_lat_region); gc()
-  message("Plotted & saved latitude interaction plot!")
+  message("5) Plotted & saved latitude interaction plot!")
   
   
   ######################################## 
-  # Plot 4: Using marginaleffects package 
+  # 6) Using marginaleffects package 
   ########################################
   update_geom_defaults("line", list(linewidth = 3))
   
-  #pdiff ~ rdiff*status
+  #pdiff ~ rdiff*nativity
   p = plot_predictions(fit, 
-                   condition = c("rdiff", "status"),  # x1 on x-axis, lines per x2
-  		             ndraws = n)
+                       condition = c("rdiff", "nativity"),  # x1 on x-axis, lines per x2
+                       allow_new_levels = TRUE, ndraws = n)
   p + theme_minimal() +
-      theme(plot.background = element_rect(fill = "gray99", color = NA),
-        axis.text = element_text(size = 22),
-        axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-        axis.title = element_text(size = 22),
-        plot.title = element_text(size = 22, hjust = 0.5),
-        legend.text = element_text(size = 22),
-        legend.title = element_text(size = 22),
-        legend.position = c(0.92, 0.1),
-        legend.box.background = element_rect(fill = "white", color = "grey99"))
+    theme(plot.background = element_rect(fill = "gray99", color = NA),
+          axis.text = element_text(size = 22),
+          axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22),
+          legend.position = c(0.92, 0.1),
+          legend.box.background = element_rect(fill = "white", color = "grey99"))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_status_interaction_poster.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_Interaction_nativity_poster.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600)
   
   #pdiff ~ rdiff*latitude
   p = plot_predictions(fit, 
-                   condition = c("rdiff", "latitude"),  # x1 on x-axis, lines per x2
-                   ndraws = n)
+                       condition = c("rdiff", "latitude"),  # x1 on x-axis, lines per x2
+                       allow_new_levels = TRUE, ndraws = n)
   p + theme_minimal() +
     theme(plot.background = element_rect(fill = "gray99", color = NA),
-      axis.text = element_text(size = 22),
-      axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-      axis.title = element_text(size = 22),
-      plot.title = element_text(size = 22, hjust = 0.5),
-      legend.text = element_text(size = 22),
-      legend.title = element_text(size = 22),
-      legend.position = c(0.92, 0.1),
-      legend.box.background = element_rect(fill = "white", color = "grey99"))
+          axis.text = element_text(size = 22),
+          axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22),
+          legend.position = c(0.92, 0.1),
+          legend.box.background = element_rect(fill = "white", color = "grey99"))
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_latitude_interaction_cont_poster.png")), last_plot(), 
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_Interaction_latitude_cont_poster.png")), last_plot(), 
          width = 16, height = 11, units = "in", dpi = 600)
   
-  #pdiff ~ rdiff*functional_type
+  #pdiff ~ rdiff*dispersal
   p = plot_predictions(fit, 
-                   condition = c("rdiff", "functional_type"),  # x1 on x-axis, lines per x2
-                   ndraws = n)
+                       condition = c("rdiff", "dispersal"),  # x1 on x-axis, lines per x2
+                       allow_new_levels = TRUE, ndraws = n)
   p + theme_minimal() +
     theme(plot.background = element_rect(fill = "gray99", color = NA),
-      axis.text = element_text(size = 22),
-      axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
-      axis.title = element_text(size = 22),
-      plot.title = element_text(size = 22, hjust = 0.5),
-      legend.text = element_text(size = 22),
-      legend.title = element_text(size = 22),
-      legend.position = c(0.80, 0.2),
-      legend.box.background = element_rect(fill = "white", color = "grey99")) 
+          axis.text = element_text(size = 22),
+          axis.text.x = element_text(angle = -45, hjust = 0, vjust = 1),
+          axis.title = element_text(size = 22),
+          plot.title = element_text(size = 22, hjust = 0.5),
+          legend.text = element_text(size = 22),
+          legend.title = element_text(size = 22),
+          legend.position = c(0.80, 0.2),
+          legend.box.background = element_rect(fill = "white", color = "grey99")) 
   
-  ggsave(file.path(graphs, paste0(mod, "_", type, "_R", run, "_brms_Plot_functype_poster.png")), last_plot(),
+  ggsave(file.path(graphs, paste0("brms_plot_", "Run", run, "_", group, "_", type,  "_LinearPlot_dipersal_poster.png")), last_plot(),
          width = 16, height = 11, units = "in", dpi = 600)
+  
+  message("6) Plotted & saved marginal error plots!")
+}
 
-  message("Plotted & saved marginal error plots!")
-  }
+
+#run function
+fit.plot(run = "1", group = "training", type = "nativity")
 
 
 
-# fit.plot(fitb, mod, type = "training"); fit.plot(fitt, mod, type = "testing")
-#Match SLURM allocation
-n.cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 2))  
-#apply function -- in parallel 
-mclapply(
-  list(
-    list(fitb, "training"),
-    list(fitt, "testing")),
-  function(args) fit.plot(args[[1]], mod, type = args[[2]], run),
-mc.cores = n.cores #number of cores requested 
-  )
 
+# # fit.plot(fitb, mod, type = "training"); fit.plot(fitt, mod, type = "testing")
+# #Match SLURM allocation
+# n.cores <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", 2))  
+# #apply function -- in parallel 
+# mclapply(
+#   list(
+#     list(fitb, "training"),
+#     list(fitt, "testing")),
+#   function(args) fit.plot(args[[1]], mod, type = args[[2]], run),
+# mc.cores = n.cores #number of cores requested 
+#   )
 
 
 

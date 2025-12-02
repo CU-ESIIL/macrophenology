@@ -194,7 +194,7 @@ fit.plot <- function(run, group, type){
   #   distinct() %>%
   #   slice_sample(n = 1000)
   newdata_grid <- sub.data %>%
-    select(rdiff, dispersal, latitude, nativity, species, domain_id) %>%
+    select(rdiff, dispersal, latitude, nativity, species, domain_id, rsd, psd) %>%
     distinct() %>%
     slice_sample(n = 1000)
   # Match factor levels exactly
@@ -228,7 +228,7 @@ fit.plot <- function(run, group, type){
          width = 16, height = 11, units = "in", dpi = 600)
   
   rm(model_fit, newdata_grid, preds_simple); gc()
-  message("4. Plotted & saved simple regression plot!")
+  message("4) Plotted & saved simple regression plot!")
   
   
   ##################################################  

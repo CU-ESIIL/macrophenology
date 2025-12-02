@@ -17,7 +17,7 @@ suppressPackageStartupMessages({
 ##############
 # Directories
 #############
-mwd = "~/data-store/home/lamador/Data"
+mwd = "D:/Career_Journey/Collaborations/ESIIL_Macrophenology/Across_spp_SDM/Data"
 L2 = file.path(mwd, "L2")
 graphs = file.path(L2, "Graphs")
 
@@ -36,17 +36,17 @@ comm.sp = intersect(unique(rang$species), unique(phe$species))
 #filter for common species overlap
 rang.comm.sp = rang %>%
   filter(species %in% comm.sp) %>%
-  rename(rdiff = diff_val) %>%
+  rename(rdiff = mean, rsd = sd) %>%
   arrange(species, latitude, longitude)
 phe.comm.sp = phe %>%
   filter(species %in% comm.sp) %>%
-  rename(pdiff = diff_val) %>%
+  rename(pdiff = mean, psd = sd) %>%
   arrange(species, latitude, longitude)
 #free up space
 rm(phe, rang); gc()
 
 #Merge the two (whichiver one ihas more rows will be first)
-all.data = left_join(rang.comm.sp, phe.comm.sp, by = c("latitude", "longitude", "species"))
+all.data = left_join(phe.comm.sp, rang.comm.sp, by = c("latitude", "longitude", "species"))
 all.data = all.data[!is.na(all.data$rdiff),]
 #free up space
 rm(rang.comm.sp, phe.comm.sp); gc()
@@ -56,21 +56,25 @@ rm(rang.comm.sp, phe.comm.sp); gc()
 ###############
 #Add more species information
 sp.info = read.csv(file.path(L2, "Focal_Species_List_Information.csv"), header = TRUE)
+sp.info = sp.info %>%
+  rename(species = Species, funct_type_description = Functional.Type, 
+         funct_type = Functional.Type, nativity_gbif = Nativity, nativity = Nativity_GloNAF,
+         genus_comon_name = Genus.Common.Name, dispersal = Dispersal, dispersal_url = Dispersal.URL)
 #phenology list filter by presence threshold only
 all.data = left_join(all.data, sp.info, by = "species")
 
 #Save summary info
 sink(file= file.path(graphs, "All_Species_Info_Tables_Range_Phenology.txt"))
-a = all.data %>% count(status, functional_type)
+a = all.data %>% count(nativity, funct_type)
 print(a)
 
 b = all.data %>%
-  group_by(species, functional_type, status) %>%
+  group_by(species, funct_type, nativity) %>%
   summarise(n())
 print(b, n = 1654)
 
-table(all.data$status)
-table(all.data$functional_type)
+table(all.data$nativity)
+table(all.data$funct_type)
 table(all.data$genus_common_name)
 table(all.data$species)
 
@@ -96,16 +100,16 @@ model.data.clean <- all.data %>%
     IQR = Q3 - Q1,
     lower = Q1 - 1.5 * IQR,
     upper = Q3 + 1.5 * IQR,
-    status = factor(status),
-    functional_type = factor(functional_type)
+    nativity = factor(nativity),
+    funct_type = factor(funct_type)
   ) %>%
   filter(pdiff >= lower & pdiff <= upper) %>%
   ungroup() %>%
   select(-Q1, -Q3, -IQR, -lower, -upper)  #clean up helper columns
 
-#remove outliers by status
+#remove outliers by nativity
 model.data.no_outliers <- model.data.clean %>%
-  group_by(status) %>%
+  group_by(nativity) %>%
   mutate(
     Q1 = quantile(pdiff, 0.25, na.rm = TRUE),
     Q3 = quantile(pdiff, 0.75, na.rm = TRUE),
@@ -117,11 +121,11 @@ model.data.no_outliers <- model.data.clean %>%
   ungroup() %>%
   select(-Q1, -Q3, -IQR, -lower_bound, -upper_bound)  # optional cleanup
 
-# boxplot(model.data.no_outliers$pdiff ~ model.data.no_outliers$status)
+# boxplot(model.data.no_outliers$pdiff ~ model.data.no_outliers$nativity)
 #
 # #remove outliers by functional type
 model.data.no_outliers1 <- model.data.no_outliers %>%
-  group_by(functional_type) %>%
+  group_by(funct_type) %>%
   mutate(
     Q1 = quantile(pdiff, 0.25, na.rm = TRUE),
     Q3 = quantile(pdiff, 0.75, na.rm = TRUE),
@@ -134,8 +138,8 @@ model.data.no_outliers1 <- model.data.no_outliers %>%
   select(-Q1, -Q3, -IQR, -lower_bound, -upper_bound)  # optional cleanup
 
 # pdf(file.path(graphs, "All_Data_ModelData_NoOut_Plots.pdf"))
-# boxplot(model.data.no_outliers1$pdiff ~ model.data.no_outliers1$functional_type)
-# boxplot(model.data.no_outliers1$pdiff ~ model.data.no_outliers1$status)
+# boxplot(model.data.no_outliers1$pdiff ~ model.data.no_outliers1$funct_type)
+# boxplot(model.data.no_outliers1$pdiff ~ model.data.no_outliers1$nativity)
 # hist(model.data.no_outliers1$pdiff)
 # hist(model.data.no_outliers1$rdiff)
 # hist(model.data.no_outliers1$latitude)
@@ -162,7 +166,7 @@ rm(all.data); gc()
 #intersect to get domain information
 v.domain = intersect(v, domains)
 #Free up space
-rm(v, v.domain); gc()
+rm(v, domains); gc()
 #turn back into data frame
 model.data.d = as.data.frame(v.domain)
 # names(model.data.d)
@@ -205,7 +209,7 @@ save(sub.data, file=file.path(L2, "Subset_ModelData_NoOutliers.RData"))
 
 
 #Save summary info
-sink(file= file.path(L2, "All_Species_Info_Tables_Range_Phenology_ModelData_Subset.txt"))
+sink(file= file.path(graphs, "All_Species_Info_Tables_Range_Phenology_ModelData_Subset.txt"))
 print(paste0("resolution: ", r))
 cat("\n")
 str(sub.data)
@@ -217,7 +221,7 @@ cat("\n")
 unique(sub.data$species)
 unique(sub.data$domain_id)
 unique(sub.data$dispersal)
-unique(sub.data$functional_type)
+unique(sub.data$funct_type)
 
 a = sub.data %>% count(nativity, funct_type, dispersal)
 print(a)
@@ -255,7 +259,7 @@ c1 = c %>%
   summarise(n())
 print(c1)
 cat("\n")
-table(sub.data$genus_common_name)
+table(sub.data$genus_comon_name)
 table(sub.data$species)
 cat("\n")
 cat("\n")

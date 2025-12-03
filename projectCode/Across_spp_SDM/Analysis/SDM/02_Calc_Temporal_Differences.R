@@ -127,36 +127,47 @@ sp.csv.fun = function(type) { #START of function
     #Calculate standard deviation for each time period
     sd1 = r.c.sp$cv*r.c.sp$mean
     sd2 = r.h.sp$cv*r.h.sp$mean
+    #Daijiang/Sydne feedback
+    val1 = values(r.c.sp$mean); val2 = values(r.h.sp$mean) #use mean since cv = sd/mean in biomod2
+    #remove nas
+    val1 = na.omit(val1); val2 = na.omit(val2)
+    message("val1: ", print(dim(val1)))
+    message("val2: ", print(dim(val2)))
+    # #calc sd 
+    # sd1 = sd(val1, na.rm = TRUE); sd2 = sd(val2, na.rm = TRUE)
+    # message("sd1: " , sd1)
+    # message("sd2: " , sd2)
+    # #Calculate variance
+    # var1 = var(val1); var2 = var(val2)
+    cov12 = cov(val1, val2)
+    message("cov12: ", cov12)
+    #cov12 = rast(cov12)
+    message(dim(cov12), ", ", class(cov12))
     
-    #Daijiang feedback
-    #extract values from stand. dev. rasters
-    val1 = values(sd1); val2 = values(sd2)  
-    #Calculate variace 
-    var1 = var(val1); var2 = var(val2)
-    cov12 = cov(var1, var2)
-    
-    #Calculate the variance for each time period
-    # stacked_rasters <- c(r1, r2)
-    # #Calculate the covariance matrix (setting 'cor=FALSE')
-    # covariance_matrix <- layerCor(stacked_rasters, fun="cov", cor=FALSE)
-    # #The covariance between r1 and r2 will be in the off-diagonal elements
-    # #Get the covariance between layer 1 and layer 2:
-    # cov12 <- covariance_matrix$covariance[1, 2]
-    # print(paste("Global Covariance:", covariance_value))
-    
-    # var1 = (sd1)^2
-    # var2 = (sd2)^2
+    #Calculate variance 
+    var1 = (sd1)^2
+    var2 = (sd2)^2
     #create dependence term (for error propogation)
     # rho <- 0.5   #assumed correlation constant
     # cov12 <- rho * sqrt(var1 * var2)
     #Sum the variance for the total error between time periods
     vard = var1 + var2 + 2*cov12 #need the third summation bc time periods are dependent
+    
+    message("class vard: ", class(vard))
+    
     #Calculate the standard deviation between time periods 
     sd.dif = sqrt(vard)
     names(sd.dif) <- ("sd")
-    
+    message("dim: ", dim(sd.dif))
+    message(names(sd.dif))
+    s = as.data.frame(sd.dif) %>%
+      summarise(min = min(sd), mean = mean(sd), max = max(sd), NAs = sum(is.na(sd)), n = n())
+    message("summary of sd.dif: ", print(s))
     #recombine layers under a single object
     r.sp.dif = c(mu.dif, sd.dif)
+    
+    message(print(names(r.sp.dif)))
+    message(summary(r.sp.dif))
     # Save raster to file
     out.path <- file.path(output, paste0(gsub(" ", "_", i), "_diff_mean_sd_", type, ".tif"))
     writeRaster(r.sp.dif, filename = out.path, overwrite = TRUE)
@@ -190,6 +201,7 @@ sp.csv.fun = function(type) { #START of function
     df <- as.data.frame(r, xy = TRUE, na.rm = TRUE)
     colnames(df)[1:2] <- c("longitude", "latitude")
     
+    #not using bc mean and sd should be their own column
     #Pivot from wide (mean/sd layers) to long format (metric/val)
     # df_long <- df %>%
     #   pivot_longer(

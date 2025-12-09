@@ -38,6 +38,8 @@ if (!requireNamespace("randomForest", quietly = TRUE)) {
 #ggtext - for biomod2 plotting 
 if (!requireNamespace("ggtext", quietly = TRUE)) {
   install.packages("ggtext")}; require(ggtext)
+if (!requireNamespace("stringr", quietly = TRUE)) {
+  install.packages("stringr")}; require(stringr)
 #tools -
 if (!requireNamespace("tools", quietly = TRUE)) {
   install.packages("tools")}; require(tools)
@@ -107,7 +109,7 @@ species_names <- gsub("_", " ", species_names)
 sp.clim.c <- setNames(lapply(tif_files_c, rast), species_names)
 
 #For testing
-# df = phe.h; sp.clim = sp.clim.h; sp = sp_names; time = "H"; type = "Phenology"
+# df = phe.h; sp.clim = sp.clim.h; sp = "Acer glabrum"; time = "H"; type = "Phenology"
 
 #############
 # Function 
@@ -126,203 +128,248 @@ em.fun = function(df, sp.clim, sp, time, type){
   
   # sp.clim = list(sp.clim.rasters.h)
   class(sp.clim)
-
-    
-    ###########################
-    ## i. `biomod2` formatting 
-    ###########################
-    #Select species name
-    myRespName = sp
-    # Get corresponding P data
-    myResp = df[, myRespName]
-    # Making sure there are no 0s
-    myResp = ifelse(myResp == 1, 1, NA)
-    #Get corresponding coordinates
-    myRespXY = as.data.frame(df[, c('longitude', 'latitude')]) #Make sure long goes first!
-    
-    #Check if we have at least one presence
-    if(sum(myResp == 1, na.rm = TRUE) == 0) {
-      message("\nSkipping", myRespName, "- no presence data.\n")
-      return(NULL)
-      # next
-    }
-    
-    #check if species raster exists 
-    if(is.null(sp.clim[[myRespName]])) {
-      message("Skipping ", myRespName, ": no raster found.")
-      return(NULL)
-      # next 
-    }
-    
-    #Conditional sample size of presences
-    nb.p = sum(myResp == 1, na.rm = TRUE)
-    # Set PA.nb.rep conditionally -- (Barbet-Massin et al. 2012; Methods Ecol. Evol.)
-    if(nb.p < 1000) {
-      pa.nb.rep <- 10
-    } else {
-      pa.nb.rep <- 2
-    }
-    
-    #Format data for biomod
-    bmdat = BIOMOD_FormatingData(
-      resp.name = myRespName, #species name
-      resp.var = myResp, #presences-absences
-      resp.xy = myRespXY, #lat/lon
-      expl.var = sp.clim[[myRespName]], #raster stack
-      PA.nb.rep = pa.nb.rep,
-      PA.nb.absences = nb.p, #same number as presences (Barbet-Massin et al. 2012; Methods Ecol. Evol.)
-      PA.strategy = 'random' #method
-    )
-    
-    #Extract the data frame of presences + pseudo-absences into csv
-    bmdat.df <- dplyr::bind_cols(
-      longitude = bmdat@coord[, 1],
-      latitude = bmdat@coord[, 2],
-      status = bmdat@data.species,
-      bmdat@PA.table
-    )
-    #Save biomodout file
-    out <- file.path(em, paste0(gsub("\\.", "_", bmdat@sp.name), "_Biomod_bmdat_", time, "_", type, ".csv"))
-    print(out)
-    write.csv(bmdat.df, file = out, row.names = FALSE)
   
-    
-    ###########################
-    ## ii. Single models
-    ###########################
-    #For modeling options see: https://biomodhub.github.io/biomod2/reference/ModelsTable.html
-    # Model single models
-    biomod.sm <- BIOMOD_Modeling(bm.format = bmdat, #formatted biomod data
-                                 models = "RF",
-                                 CV.strategy = 'kfold', #cross-validation strategy
-                                 CV.nb.rep = 3, #cross-val repititions
-                                 CV.k = 5, #cross-val partitions
-                                 OPT.strategy = 'bigboss', #model param selection
-                                 var.import = 3, #number of permutations to est var importance
-                                 seed.val = 1, #to keep same results when rerunning
-                                 nb.cpu = 1, #computing resources
-                                 metric.eval = c('TSS','ROC')) #evaluation metrics
-    
-    ##save biomodout file
-    out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_SM_", time, "_", type, ".rds"))
-    print(out)
-    saveRDS(biomod.sm, file = out)
-    
-    
-    ###########################
-    ## iii. Pull best models
-    ###########################
-    ##CALIBRATION: choose high scoring models
-    modeleval <- biomod.sm@models.evaluation
-    #Create a new data frame with stuff
-    modelevaldataset <- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]],
-                                   modeleval@val[["metric.eval"]], modeleval@val[["validation"]],
-                                   modeleval@val[["calibration"]])
-    #Filter based on a TSS threshold
-    bestmodelscal <- modelevaldataset %>%
-      filter(modeleval.val...metric.eval...== "TSS") %>%
-      filter(modeleval.val...calibration... >= 0.6) # select models that had TSS over 0.6, done by Carroll et al. 2024; Ecol. App.
-    ##VALIDATION: choose high scoring models
-    #Filter based on a TSS threshold
-    bestmodelsval <- modelevaldataset %>%
-      filter(modeleval.val...metric.eval...== "TSS") %>%
-      filter(modeleval.val...validation... > 0.6)
-    ##best models
-    bestmods <- c(unique(bestmodelscal$modeleval.val...algo...), unique(bestmodelsval$modeleval.val...algo...))
-    #calibration
-    filt.cal<- bestmodelscal %>%
-      filter(modeleval.val...algo...%in% bestmods)
-    #validation
-    filt.val <- bestmodelsval %>%
-      filter(modeleval.val...algo...%in% bestmods)
-    #full names of best models
-    bestmodsfullnames = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
-    
-    #check if any best models
-    if(length(bestmodsfullnames) < 1) {
-      message("\nSkipping", myRespName, "- no best models selected\n")
-      return(NULL)
-      # next
-    }
-    
-    
-    ###########################
-    ## iv. Ensemble model
-    ###########################
-    #Model ensemble models
-    biomod.em <- try(biomod2::BIOMOD_EnsembleModeling(bm.mod = biomod.sm, #singles model output
-                                                      models.chosen = bestmodsfullnames, #vector of best models
-                                                      em.by = 'all', #what models will be combined to ensemble
-                                                      em.algo = c('EMcv', 'EMmean'), #types of ensembles models to be computed (coef. pf variation & mean)
-                                                      metric.select = c('TSS'),
-                                                      metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
-                                                      var.import = 3, #num permutationsto est var importance
-                                                      EMci.alpha = 0.05, #significance level
-                                                      EMwmean.decay = 'proportional'), #relative importance of weights
-                     
-                     silent = TRUE)
-    #Skip if ensemble modeling failed
-    if (inherits(biomod.em, "try-error")) {
-      message("Skipping ", myRespName, ": ensemble modeling failed.")
-      return(NULL)
-      # next
-    }
-    
-    #save biomodout file
-    out <- file.path(em, paste0(gsub("\\.", "_", biomod.em@sp.name), "_Biomod_EM_", time, "_", type, ".rds"))
-    print(out)
-    saveRDS(biomod.em, file = out)
-    
-    message("Initial Ensemble done")
-    
-    
-    ###########################
-    ## Ensemble Projections
-    ###########################
-    mod <- biomod.em@em.computed   # full names
-    print(mod)
-    proj = paste0(time, "_", type)
-    
-    em.proj <- tryCatch(
-      biomod2::BIOMOD_EnsembleForecasting(
-        bm.em = biomod.em,
-        proj.name = proj,      # name of folder
-        new.env = raster::stack(sp.clim[[myRespName]]), #sp.clim[[myRespName]] # still pass env in case biomod2 needs it
-        new.env.xy = myRespXY,
-        models.chosen = "all",
-        # na.rm = TRUE, 
-        # do.stack = FALSE, #avoid writing big stacked files
-        # keep.in.memory = TRUE, #keep all projections in memory or only point to link in hard drive
-        # compress = FALSE,
-        on_0_1000 = FALSE,
-        nb.cpu = 1 # <- makes sure only one core allocated -- no threading
-      ))
-    # ),
-    # error = function(e) { #This overrides the error message
-    #   message("Projection error for ", myRespName, ": ", conditionMessage(e))
-    #   return(NULL)
-    #   })
-    
-    #Save biomod ensemble file
-    out <- file.path(em, paste0(gsub("\\.", "_", em.proj@sp.name), "_Biomod_EMPRJ_", time, "_", type, ".rds"))
-    print(out)
-    saveRDS(em.proj, file = out)
-    message("End of Projections")
-    
-    
-    message("Raster extraction: ", myRespName)
-    #path to raster
-    r.path = em.proj@proj.out@link #note: raster includes all ensemble model algorithms (layers)
-    #read raster
-    r = try(terra::rast(r.path))
-    #save raster to em with new name
-    terra::writeRaster(r, filename = file.path(em, paste0(
-      gsub("\\.", "_", em.proj@sp.name), "_cv_mean_", time, "_", type, ".tif")), overwrite = TRUE)
-    
-    message("Done with ", myRespName)
-    
-    #give some time to avoid overloading server
-    Sys.sleep(1)
+  
+  ###########################
+  ## i. `biomod2` formatting 
+  ###########################
+  #Select species name
+  myRespName = sp
+  # Get corresponding P data
+  myResp = df[, myRespName]
+  # Making sure there are no 0s
+  myResp = ifelse(myResp == 1, 1, NA)
+  #Get corresponding coordinates
+  myRespXY = as.data.frame(df[, c('longitude', 'latitude')]) #Make sure long goes first!
+  
+  #Check if we have at least one presence
+  if(sum(myResp == 1, na.rm = TRUE) == 0) {
+    message("\nSkipping", myRespName, "- no presence data.\n")
+    return(NULL)
+    # next
+  }
+  
+  #check if species raster exists 
+  if(is.null(sp.clim[[myRespName]])) {
+    message("Skipping ", myRespName, ": no raster found.")
+    return(NULL)
+    # next 
+  }
+  
+  #Conditional sample size of presences
+  nb.p = sum(myResp == 1, na.rm = TRUE)
+  # Set PA.nb.rep conditionally -- (Barbet-Massin et al. 2012; Methods Ecol. Evol.)
+  if(nb.p < 1000) {
+    pa.nb.rep <- 10
+  } else {
+    pa.nb.rep <- 2
+  }
+  
+  #Format data for biomod
+  bmdat = BIOMOD_FormatingData(
+    resp.name = myRespName, #species name
+    resp.var = myResp, #presences-absences
+    resp.xy = myRespXY, #lat/lon
+    expl.var = sp.clim[[myRespName]], #raster stack
+    PA.nb.rep = pa.nb.rep,
+    PA.nb.absences = nb.p, #same number as presences (Barbet-Massin et al. 2012; Methods Ecol. Evol.)
+    PA.strategy = 'random' #method
+  )
+  
+  #Extract the data frame of presences + pseudo-absences into csv
+  bmdat.df <- dplyr::bind_cols(
+    longitude = bmdat@coord[, 1],
+    latitude = bmdat@coord[, 2],
+    status = bmdat@data.species,
+    bmdat@PA.table
+  )
+  #Save biomodout file
+  out <- file.path(em, paste0(gsub("\\.", "_", bmdat@sp.name), "_Biomod_bmdat_", time, "_", type, ".csv"))
+  print(out)
+  write.csv(bmdat.df, file = out, row.names = FALSE)
+  
+  
+  ################
+  # calib lines
+  ###############
+  # cv.k = bm_CrossValidation(bmdat, strategy = "kfold", nb.rep = 3, 
+  #                             k = 5,)
+  # cv.k = as.data.frame(cv.k) #to view better 
+  
+  ###########################
+  ## ii. Single models
+  ###########################
+  #For modeling options see: https://biomodhub.github.io/biomod2/reference/ModelsTable.html
+  # Model single models
+  biomod.sm <- BIOMOD_Modeling(bm.format = bmdat, #formatted biomod data
+                               models = "RF",
+                               CV.strategy = 'kfold', #cross-validation strategy
+                               CV.nb.rep = 3, #cross-val repititions
+                               CV.k = 5, #cross-val partitions
+                               OPT.strategy = 'bigboss', #model param selection
+                               var.import = 3, #number of permutations to est var importance
+                               seed.val = 1, #to keep same results when rerunning
+                               nb.cpu = 1, #computing resources
+                               metric.eval = c('TSS','ROC')) #evaluation metrics
+  
+  # cv.k.df = as.data.frame(get_calib_lines(biomod.sm))
+  
+  ##save biomodout file
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_SM_", time, "_", type, ".rds"))
+  print(out)
+  saveRDS(biomod.sm, file = out)
+  
+  
+  ###########################
+  ## iii. Pull best models
+  ###########################
+  ##CALIBRATION: choose high scoring models
+  modeleval <- biomod.sm@models.evaluation
+  #Create a new data frame with stuff
+  modelevaldataset <- data.frame(modeleval@val[["full.name"]], modeleval@val[["algo"]],
+                                 modeleval@val[["metric.eval"]], modeleval@val[["validation"]],
+                                 modeleval@val[["calibration"]])
+  #Filter based on a TSS threshold
+  bestmodelscal <- modelevaldataset %>%
+    filter(modeleval.val...metric.eval...== "TSS") %>%
+    filter(modeleval.val...calibration... >= 0.6) # select models that had TSS over 0.6, done by Carroll et al. 2024; Ecol. App.
+  ##VALIDATION: choose high scoring models
+  #Filter based on a TSS threshold
+  bestmodelsval <- modelevaldataset %>%
+    filter(modeleval.val...metric.eval...== "TSS") %>%
+    filter(modeleval.val...validation... > 0.6)
+  ##best models
+  bestmods <- c(unique(bestmodelscal$modeleval.val...algo...), unique(bestmodelsval$modeleval.val...algo...))
+  #calibration
+  filt.cal<- bestmodelscal %>%
+    filter(modeleval.val...algo...%in% bestmods)
+  #validation
+  filt.val <- bestmodelsval %>%
+    filter(modeleval.val...algo...%in% bestmods)
+  #full names of best models
+  bestmodsfullnames = c(filt.cal$modeleval.val...full.name..., filt.val$modeleval.val...full.name...)
+  
+  #check if any best models
+  if(length(bestmodsfullnames) < 1) {
+    message("\nSkipping", myRespName, "- no best models selected\n")
+    return(NULL)
+    # next
+  }
+  
+  ##################################
+  # Pull the cross validation data 
+  #################################
+  biomod.prj <- BIOMOD_Projection(
+    bm.mod = biomod.sm,
+    new.env = sp.clim[[myRespName]],
+    proj.name = "current",
+    selected.models = bestmodsfullnames,
+    compress = FALSE,
+    on_0_1000 = FALSE,
+    build.clamping.mask = FALSE
+  )
+  #save rds
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_PRJ_", time, "_", type, ".rds"))
+  saveRDS(biomod.prj, file = out)
+  
+  #Get predictions from projections 
+  preds <- get_predictions(biomod.prj, algo = "RF")
+  #Select RUN layers only 
+  run.layers <- grep("RUN", names(preds), value = TRUE)
+  pred.stack <- preds[[run.layers]]
+  #save raster
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_PRJ_", time, "_", type, ".tif"))
+  writeRaster(pred.stack, out, overwrite = TRUE)
+  
+  #Convert to data frame and save
+  pred.df = as.data.frame(pred.stack, xy=TRUE)
+  #rename spatial columns 
+  pred.df = rename(pred.df, longitude = x, latitude = y) 
+  #convert the prediction values from 
+  # pred.df.prob = (pred.df[, 3:length(names(pred.df))])
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_PRJ_", time, "_", type, ".cvs"))
+  print(out)
+  write.csv(pred.df, file = out, row.names = FALSE)
+  
+  
+  ###########################
+  ## iv. Ensemble model
+  ###########################
+  #Model ensemble models
+  biomod.em <- try(biomod2::BIOMOD_EnsembleModeling(bm.mod = biomod.sm, #singles model output
+                                                    models.chosen = bestmodsfullnames, #vector of best models
+                                                    em.by = 'all', #what models will be combined to ensemble
+                                                    em.algo = c("mean", "cv"), #types of ensembles models to be computed 
+                                                    metric.select = c('TSS'),
+                                                    metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
+                                                    var.import = 3, #num permutationsto est var importance
+                                                    EMci.alpha = 0.05, #significance level
+                                                    EMwmean.decay = 'proportional'), #relative importance of weights
+                   
+                   silent = TRUE)
+  #Skip if ensemble modeling failed
+  if (inherits(biomod.em, "try-error")) {
+    message("Skipping ", myRespName, ": ensemble modeling failed.")
+    return(NULL)
+    # next
+  }
+  
+  #save biomodout file
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.em@sp.name), "_Biomod_EM_", time, "_", type, ".rds"))
+  print(out)
+  saveRDS(biomod.em, file = out)
+  
+  message("Initial Ensemble done")
+  
+  
+  ###########################
+  ## Ensemble Projections
+  ###########################
+  mod <- biomod.em@em.computed   # full names
+  print(mod)
+  proj = paste0(time, "_", type)
+  
+  em.proj <- tryCatch(
+    biomod2::BIOMOD_EnsembleForecasting(
+      bm.em = biomod.em,
+      proj = biomod.prj, #include the already run single projections -- else it will do it again independently
+      proj.name = proj,      # name of folder
+      new.env = raster::stack(sp.clim[[myRespName]]), #sp.clim[[myRespName]] # still pass env in case biomod2 needs it
+      new.env.xy = myRespXY,
+      models.chosen = "all",
+      # na.rm = TRUE, 
+      # do.stack = FALSE, #avoid writing big stacked files
+      # keep.in.memory = TRUE, #keep all projections in memory or only point to link in hard drive
+      # compress = FALSE,
+      on_0_1000 = FALSE,
+      nb.cpu = 1 # <- makes sure only one core allocated -- no threading
+    ))
+  # ),
+  # error = function(e) { #This overrides the error message
+  #   message("Projection error for ", myRespName, ": ", conditionMessage(e))
+  #   return(NULL)
+  #   })
+  
+  #Save biomod ensemble file
+  out <- file.path(em, paste0(gsub("\\.", "_", em.proj@sp.name), "_Biomod_EMPRJ_", time, "_", type, ".rds"))
+  print(out)
+  saveRDS(em.proj, file = out)
+  message("End of Projections")
+  
+  
+  message("Raster extraction: ", myRespName)
+  #path to raster
+  r.path = em.proj@proj.out@link #note: raster includes all ensemble model algorithms (layers)
+  #read raster
+  r = try(terra::rast(r.path))
+  #save raster to em with new name
+  terra::writeRaster(r, filename = file.path(em, paste0(
+    gsub("\\.", "_", em.proj@sp.name), "_cv_mean_", time, "_", type, ".tif")), overwrite = TRUE)
+  
+  message("Done with ", myRespName)
+  
+  #give some time to avoid overloading server
+  Sys.sleep(1)
   # }#END of for loop
   
 } #END of function
@@ -334,7 +381,7 @@ em.fun = function(df, sp.clim, sp, time, type){
 #Identifty the number of available cores 
 detectCores()#set the range of species to be modeled
 
-sp_names = sp[2:length(sp)]
+sp_names = sp
 
 #Function to run all time-type combos for one species
 em.fun.one.sp = function(sp1){
@@ -369,6 +416,8 @@ x = lapply(sp_names, FUN = em.fun.one.sp)
 
 #Sum elapsed time across list items 
 total_elapsed <- sum(sapply(x, function(i) i[["elapsed"]]))
+
+sink(file.path(em, "runtime.txt"))
 #Convert to minutes if desired
 min <- round(total_elapsed / 60, 2)
 #readable output 
@@ -378,3 +427,5 @@ if(min > 59){
 } else{
   message("Total run time: ", min, "min")
 }
+sink()
+

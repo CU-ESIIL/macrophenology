@@ -32,7 +32,7 @@ em = file.path(L2, "SDM/SDM_Uncertainty") #output file for results
 
 #dir.create("Range") #create directory 
 # output = file.path(L2, "sp_diff")
-output = file.path(L2, "sp_diff")
+output = L2
 
 #Ensure the directory exists!
 if (!dir.exists(output)) {
@@ -42,67 +42,6 @@ if (!dir.exists(output)) {
   message("Using existing directory at: ", output)
 }
 
-##################
-#pull raster data 
-##################
-#1. List .tif files 
-tif.files.h = list.files(path = em,
-                         pattern = paste0("_cv_mean_H_", type, "\\.tif$"), #e.g., Acer_glabrum_cv_mean_C_Phenology.tif
-                         full.names = TRUE)
-tif.files.c = list.files(path = em,
-                         pattern = paste0("_cv_mean_C_", type, "\\.tif$"),
-                         full.names = TRUE)
-#2. Extract species names from filenames
-# filenames look like: Genus_species_EMwmeanByTSS_..._H_Phenology.tif
-species.names.h = tif.files.h %>%
-  basename() %>%
-  str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
-species.names.c = tif.files.c %>%
-  basename() %>%
-  str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
-#3. Read rasters into list
-rast.h = lapply(tif.files.h, rast)
-rast.c = lapply(tif.files.c, rast)
-#5. Assign species names as layer names
-names(rast.h) <- gsub("_", " ", species.names.h)
-names(rast.c) <- gsub("_", " ", species.names.c)
-
-#Load US boundary vector (replace with your actual file)
-conus <- vect(file.path(L2, "conus.shp"))
-# Reproject US shapefile to match rasters, if needed
-conus <- project(conus, crs(rast.h$`Acer glabrum`))  #Make sure it's in same CRS - pick a random raster
-
-
-#species list - going with the common species
-sp = intersect(names(rast.h), names(rast.c))
-
-###############
-#pull csv data 
-###############
-#1. List .tif files 
-csv.files.h = list.files(path = em,
-                         pattern = paste0("_Biomod_PRJ_H_", type, "\\.csv$"), #e.g., Acer_glabrum_cv_mean_C_Phenology.tif
-                         full.names = TRUE)
-csv.files.c = list.files(path = em,
-                         pattern = paste0("_Biomod_PRJ_C_", type, "\\.csv$"),
-                         full.names = TRUE)
-#2. Extract species names from filenames
-# filenames look like: Genus_species_EMwmeanByTSS_..._H_Phenology.tif
-species.names.h = csv.files.h %>%
-  basename() %>%
-  str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
-species.names.c = csv.files.c %>%
-  basename() %>%
-  str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
-#3. Read rasters into list
-csv.h = lapply(csv.files.h, read.csv)
-csv.c = lapply(csv.files.c, read.csv)
-#5. Assign species names as layer names
-names(csv.h) <- gsub("_", " ", species.names.h)
-names(csv.c) <- gsub("_", " ", species.names.c)
-
-
-
 
 ##############
 # Function 
@@ -110,7 +49,70 @@ names(csv.c) <- gsub("_", " ", species.names.c)
 #type: Phenology or Range
 
 sp.csv.fun = function(type) { #START of function
-  #---------Calc differences raster----------
+  ##################
+  #pull raster data 
+  ##################
+  #1. List .tif files 
+  tif.files.h = list.files(path = em,
+                           pattern = paste0("_cv_mean_H_", type, "\\.tif$"), #e.g., Acer_glabrum_cv_mean_C_Phenology.tif
+                           full.names = TRUE)
+  tif.files.c = list.files(path = em,
+                           pattern = paste0("_cv_mean_C_", type, "\\.tif$"),
+                           full.names = TRUE)
+  #2. Extract species names from filenames
+  # filenames look like: Genus_species_EMwmeanByTSS_..._H_Phenology.tif
+  species.names.h = tif.files.h %>%
+    basename() %>%
+    str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
+  species.names.c = tif.files.c %>%
+    basename() %>%
+    str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
+  #3. Read rasters into list
+  rast.h = lapply(tif.files.h, rast)
+  rast.c = lapply(tif.files.c, rast)
+  #5. Assign species names as layer names
+  names(rast.h) <- gsub("_", " ", species.names.h)
+  names(rast.c) <- gsub("_", " ", species.names.c)
+  
+  #Load US boundary vector (replace with your actual file)
+  conus <- vect(file.path(L2, "conus.shp"))
+  # Reproject US shapefile to match rasters, if needed
+  conus <- project(conus, crs(rast.h$`Acer glabrum`))  #Make sure it's in same CRS - pick a random raster
+  
+  
+  #species list - going with the common species
+  sp = intersect(names(rast.h), names(rast.c))
+  
+  
+  ###############
+  #pull csv data 
+  ###############
+  #1. List .tif files 
+  csv.files.h = list.files(path = em,
+                           pattern = paste0("_Biomod_PRJ_H_", type, "\\.csv$"), #e.g., Acer_glabrum_cv_mean_C_Phenology.tif
+                           full.names = TRUE)
+  csv.files.c = list.files(path = em,
+                           pattern = paste0("_Biomod_PRJ_C_", type, "\\.csv$"),
+                           full.names = TRUE)
+  #2. Extract species names from filenames
+  # filenames look like: Genus_species_EMwmeanByTSS_..._H_Phenology.tif
+  species.names.h = csv.files.h %>%
+    basename() %>%
+    str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
+  species.names.c = csv.files.c %>%
+    basename() %>%
+    str_extract("^[^_]+_[^_]+")  #Extracts "Genus_species"
+  #3. Read rasters into list
+  csv.h = lapply(csv.files.h, read.csv)
+  csv.c = lapply(csv.files.c, read.csv)
+  #5. Assign species names as layer names
+  names(csv.h) <- gsub("_", " ", species.names.h)
+  names(csv.c) <- gsub("_", " ", species.names.c)
+  
+  
+  #########################
+  #Calc differences raster
+  #########################
   # container to store results across species
   all_species_out <- list()
   
@@ -165,7 +167,6 @@ sp.csv.fun = function(type) { #START of function
     #Calculate the variance across folds 
     var1 = apply(df.c.sp[3:length(names(df.c.sp))], 1, var); var2 = apply(df.h.sp[3:length(names(df.h.sp))], 1, var)
     #Calculate the covariance across folds 
-    # cov12 = cov(df.c.sp[3:length(names(df.c.sp))], df.h.sp[3:length(names(df.h.sp))])
     mat1 <- as.matrix(df.c.sp[, -c(1,2)])  # remove longitude/latitude
     mat2 <- as.matrix(df.h.sp[, -c(1,2)])
     cov12 <- apply(
@@ -174,25 +175,15 @@ sp.csv.fun = function(type) { #START of function
         x <- row[1:n]
         y <- row[(n+1):(2*n)]
         cov(x, y)
-      }
-    )
-    # cov12 <- df1[, c("longitude", "latitude")]
-    # cov12$cov_value <- cov_values
-    
+      }) #END apply
     #Sum the variance for the total error between time periods
     vard = var1 + var2 + (2*cov12) #need the third summation bc time periods are dependent
     #Calculate the standard deviation between time periods 
     sd.dif.df = as.data.frame(sqrt(vard))
     names(sd.dif.df) <- ("sd_diff")
-    #add lat/lon info 
-    # sd.dif.df = cbind(df.c.sp[, 1:2], sd.dif.df)
-    
     
     #recombine under a single object
     r.sp.dif = cbind(mu.dif.df, sd.dif.df)
-    # Save raster to file
-    # out.path <- file.path(output, paste0(gsub(" ", "_", i), "_diff_mean_sd_", type, ".csv"))
-    # writeRaster(r.sp.dif, filename = out.path, overwrite = TRUE)
     
     # add species name column for merging
     r.sp.dif$species <- i
@@ -208,15 +199,15 @@ sp.csv.fun = function(type) { #START of function
   
   #Export 
   write.csv(final_output,
-            file = file.path(output, file.path(output, paste0("AllSpecies_EMProj_diff_", type, ".csv"))),
+            file = file.path(output, paste0("AllSpecies_EMProj_diff_", type, ".csv")),
             row.names = FALSE)
   message("Outputted csv for: ", type)
 } #END of function 
 
 
-#Call funciton 
-sp.csv.fun("Phenology")
-sp.csv.fun("Range")
+#Call function 
+sp.csv.fun(type = "Phenology")
+sp.csv.fun(type = "Range")
 
 
 

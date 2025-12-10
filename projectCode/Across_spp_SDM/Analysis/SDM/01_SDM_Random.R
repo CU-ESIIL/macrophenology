@@ -287,7 +287,7 @@ em.fun = function(df, sp.clim, sp, time, type){
   pred.df = rename(pred.df, longitude = x, latitude = y) 
   #convert the prediction values from 
   # pred.df.prob = (pred.df[, 3:length(names(pred.df))])
-  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_PRJ_", time, "_", type, ".cvs"))
+  out <- file.path(em, paste0(gsub("\\.", "_", biomod.sm@sp.name), "_Biomod_PRJ_", time, "_", type, ".csv"))
   print(out)
   write.csv(pred.df, file = out, row.names = FALSE)
   
@@ -299,7 +299,7 @@ em.fun = function(df, sp.clim, sp, time, type){
   biomod.em <- try(biomod2::BIOMOD_EnsembleModeling(bm.mod = biomod.sm, #singles model output
                                                     models.chosen = bestmodsfullnames, #vector of best models
                                                     em.by = 'all', #what models will be combined to ensemble
-                                                    em.algo = c("mean", "cv"), #types of ensembles models to be computed 
+                                                    em.algo = c("EMmean", "EMcv"), #types of ensembles models to be computed 
                                                     metric.select = c('TSS'),
                                                     metric.eval = c('TSS', 'ROC'), #evaluation metrics to filter models
                                                     var.import = 3, #num permutationsto est var importance
@@ -381,7 +381,7 @@ em.fun = function(df, sp.clim, sp, time, type){
 #Identifty the number of available cores 
 detectCores()#set the range of species to be modeled
 
-sp_names = sp
+sp_names = sp[2:length(sp)]
 
 #Function to run all time-type combos for one species
 em.fun.one.sp = function(sp1){

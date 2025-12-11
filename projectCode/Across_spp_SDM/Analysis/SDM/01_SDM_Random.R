@@ -109,7 +109,7 @@ species_names <- gsub("_", " ", species_names)
 sp.clim.c <- setNames(lapply(tif_files_c, rast), species_names)
 
 #For testing
-# df = phe.h; sp.clim = sp.clim.h; sp = "Acer glabrum"; time = "H"; type = "Phenology"
+df = phe.h; sp.clim = sp.clim.h; sp = "Acer glabrum"; time = "H"; type = "Phenology"
 
 #############
 # Function 
